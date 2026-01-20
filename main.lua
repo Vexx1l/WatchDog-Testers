@@ -65,11 +65,11 @@ local mySettings = loadData(LOCAL_FILE, {
 local HEARTBEAT_INTERVAL = mySettings.Timer
 local WEBHOOK_URL = mySettings.Webhook:gsub("%s+", "")
 local DISCORD_USER_ID = mySettings.UserID
-local monitorActive = mySettings.MonitorEnabled
 local startTime = os.time()
 local isBlocked = false
 local blockExpires = 0
 local forceRestartLoop = false
+local monitorActive = mySettings.MonitorEnabled
 
 local antiAfkActive = false
 local autoRejoinActive = mySettings.AutoRejoin
@@ -78,7 +78,8 @@ local currentAfkInterval = mySettings.AntiAfkTime
 
 -- 3. WEBHOOK CORE
 local function sendWebhook(title, reason, color, isUpdateLog)
-    if not monitorActive or WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
+    if not monitorActive and not isUpdateLog then return end
+    if WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
     if isBlocked and tick() < blockExpires then return end
     isBlocked = false
 
@@ -90,7 +91,7 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     }
 
     if isUpdateLog then
-        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Build 6.2.0*"
+        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.2.0*"
     else
         embed.description = "Status for **" .. player.Name .. "**"
         embed.fields = {
@@ -112,12 +113,12 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     local requestFunc = (request or http_request or syn.request or (http and http.request))
     if requestFunc then
         task.spawn(function()
-            local s, r = pcall(function()
+            local success, response = pcall(function()
                 return requestFunc({Url = WEBHOOK_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = payload})
             end)
-            if r and r.StatusCode == 429 then
+            if response and response.StatusCode == 429 then
                 isBlocked = true
-                blockExpires = tick() + (tonumber(r.Headers["retry-after"]) or 60)
+                blockExpires = tick() + (tonumber(response.Headers["retry-after"]) or 60)
             end
         end)
     end
@@ -136,8 +137,16 @@ MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 
+-- THEME SYSTEM
 local currentTheme = Color3.fromRGB(unpack(mySettings.ThemeColor or {0, 170, 255}))
 local Stroke = Instance.new("UIStroke", MainFrame); Stroke.Color = currentTheme; Stroke.Thickness = 2
+
+local function updateUITheme(newColor)
+    currentTheme = newColor
+    Stroke.Color = newColor
+    mySettings.ThemeColor = {math.floor(newColor.R*255), math.floor(newColor.G*255), math.floor(newColor.B*255)}
+    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
+end
 
 -- Top Bar
 local TopBar = Instance.new("Frame", MainFrame)
@@ -154,6 +163,7 @@ CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.new(1,0,0); CloseBtn.Backgroun
 local MinBtn = Instance.new("TextButton", TopBar); MinBtn.Size = UDim2.new(0, 30, 0, 30); MinBtn.Position = UDim2.new(0, 5, 0, 2)
 MinBtn.Text = "-"; MinBtn.TextColor3 = Color3.new(0,1,1); MinBtn.BackgroundTransparency = 1; MinBtn.Font = Enum.Font.GothamBold
 
+-- Content Wrapper
 local Content = Instance.new("Frame", MainFrame)
 Content.Size = UDim2.new(1, 0, 1, -35); Content.Position = UDim2.new(0, 0, 0, 35); Content.BackgroundTransparency = 1
 
@@ -175,24 +185,19 @@ local SettingsTab = createTab()
 -- 5. CONTENT: MONITOR TAB
 local timerLabel = Instance.new("TextLabel", MonitorTab)
 timerLabel.Size = UDim2.new(1, 0, 0, 60); timerLabel.Position = UDim2.new(0, 0, 0.05, 0)
-timerLabel.Text = "00:00"; timerLabel.TextColor3 = currentTheme; timerLabel.TextSize = 40; timerLabel.Font = Enum.Font.GothamBold; timerLabel.BackgroundTransparency = 1
+timerLabel.Text = "00:00"; timerLabel.TextColor3 = monitorActive and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 50, 50)
+timerLabel.TextSize = 40; timerLabel.Font = Enum.Font.GothamBold; timerLabel.BackgroundTransparency = 1
 
 local monitorStatus = Instance.new("TextLabel", MonitorTab)
-monitorStatus.Size = UDim2.new(0.95, 0, 0, 50); monitorStatus.Position = UDim2.new(0.025, 0, 0.35, 0)
+monitorStatus.Size = UDim2.new(0.95, 0, 0, 50); monitorStatus.Position = UDim2.new(0.025, 0, 0.4, 0)
 monitorStatus.BackgroundColor3 = Color3.fromRGB(30, 30, 35); monitorStatus.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-monitorStatus.Text = "Heartbeat: Active\nUptime: 0h 0m"; monitorStatus.Font = Enum.Font.Code; monitorStatus.TextSize = 11
+monitorStatus.Text = "Heartbeat: "..(monitorActive and "Enabled" or "Disabled").."\nUptime: 0h 0m"; monitorStatus.Font = Enum.Font.Code; monitorStatus.TextSize = 11
 Instance.new("UICorner", monitorStatus)
 
-local monitorToggleBtn = Instance.new("TextButton", MonitorTab)
-monitorToggleBtn.Size = UDim2.new(0.95, 0, 0, 30); monitorToggleBtn.Position = UDim2.new(0.025, 0, 0.58, 0)
-monitorToggleBtn.Text = monitorActive and "MONITOR: ON" or "MONITOR: OFF"
-monitorToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 120, 70) or Color3.fromRGB(50, 50, 60)
-monitorToggleBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", monitorToggleBtn)
-
-local testBtn = Instance.new("TextButton", MonitorTab)
-testBtn.Size = UDim2.new(0.5, 0, 0, 30); testBtn.Position = UDim2.new(0.25, 0, 0.78, 0)
-testBtn.Text = "🧪 SEND TEST"; testBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50); testBtn.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", testBtn)
+local hbToggleBtn = Instance.new("TextButton", MonitorTab)
+hbToggleBtn.Size = UDim2.new(0.5, 0, 0, 35); hbToggleBtn.Position = UDim2.new(0.25, 0, 0.75, 0)
+hbToggleBtn.Text = monitorActive and "HB: ON" or "HB: OFF"; hbToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 100, 50) or Color3.fromRGB(100, 0, 0); hbToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", hbToggleBtn)
 
 -- 6. CONTENT: SHIELD TAB
 local shieldStatus = Instance.new("TextLabel", ShieldTab)
@@ -222,8 +227,8 @@ end
 
 local timeB = createSetBtn("HB TIMER", UDim2.new(0.02, 0, 0, 0), Color3.new(0, 1, 0.5))
 local cfgB = createSetBtn("WEBHOOK/ID", UDim2.new(0.52, 0, 0, 0), Color3.new(1, 0.7, 0))
-local botB = createSetBtn("COPY BOT LINK", UDim2.new(0.02, 0, 0.25, 0), currentTheme)
-local colorB = createSetBtn("THEME", UDim2.new(0.52, 0, 0.25, 0), Color3.new(1,1,1))
+local botB = createSetBtn("COPY BOT LINK", UDim2.new(0.02, 0, 0.25, 0), Color3.new(0, 0.7, 1))
+local themeB = createSetBtn("CHANGE THEME", UDim2.new(0.52, 0, 0.25, 0), Color3.new(1, 1, 1))
 local dscB = createSetBtn("COPY DISCORD", UDim2.new(0.02, 0, 0.5, 0), Color3.new(0.5, 0.5, 1))
 local resetB = createSetBtn("FULL RESET", UDim2.new(0.52, 0, 0.5, 0), Color3.new(1, 0.2, 0))
 
@@ -231,7 +236,7 @@ local resetB = createSetBtn("FULL RESET", UDim2.new(0.52, 0, 0.5, 0), Color3.new
 local function createOverlay(placeholder)
     local o = Instance.new("Frame", MainFrame); o.Size = UDim2.new(1,0,1,0); o.BackgroundColor3 = Color3.fromRGB(15, 15, 20); o.Visible = false; o.ZIndex = 10; Instance.new("UICorner", o)
     local t = Instance.new("TextBox", o); t.Size = UDim2.new(0.8, 0, 0.2, 0); t.Position = UDim2.new(0.1, 0, 0.3, 0); t.PlaceholderText = placeholder; t.BackgroundColor3 = Color3.fromRGB(30,30,40); t.TextColor3 = Color3.new(1,1,1); t.ZIndex = 11; Instance.new("UICorner", t)
-    local c = Instance.new("TextButton", o); c.Size = UDim2.new(0.8, 0, 0.2, 0); c.Position = UDim2.new(0.1, 0, 0.6, 0); c.Text = "CONFIRM"; c.BackgroundColor3 = currentTheme; c.ZIndex = 11; Instance.new("UICorner", c)
+    local c = Instance.new("TextButton", o); c.Size = UDim2.new(0.8, 0, 0.2, 0); c.Position = UDim2.new(0.1, 0, 0.6, 0); c.Text = "CONFIRM"; c.BackgroundColor3 = Color3.fromRGB(0, 170, 255); c.ZIndex = 11; Instance.new("UICorner", c)
     local b = Instance.new("TextButton", o); b.Size = UDim2.new(0, 30, 0, 30); b.Position = UDim2.new(0, 10, 0, 5); b.Text = "<-"; b.TextColor3 = Color3.new(1,1,1); b.BackgroundTransparency = 1; b.ZIndex = 11
     b.MouseButton1Click:Connect(function() o.Visible = false end)
     return o, t, c
@@ -241,29 +246,7 @@ local timeO, timeI, timeC = createOverlay("Interval in Minutes")
 local webO, webI, webC = createOverlay("Webhook URL")
 local idO, idI, idC = createOverlay("Discord User ID")
 
--- 9. LOGIC: THEME & TABS
-local themes = {
-    {0, 170, 255}, -- Blue
-    {255, 85, 0},  -- Orange
-    {170, 0, 255}, -- Purple
-    {0, 255, 127}, -- Spring Green
-    {255, 215, 0}  -- Gold
-}
-local themeIdx = 1
-
-local function updateTheme(rgb)
-    local newCol = Color3.fromRGB(unpack(rgb))
-    currentTheme = newCol
-    Stroke.Color = newCol
-    timerLabel.TextColor3 = newCol
-    botB.TextColor3 = newCol
-    timeC.BackgroundColor3 = newCol
-    webC.BackgroundColor3 = newCol
-    idC.BackgroundColor3 = newCol
-    mySettings.ThemeColor = rgb
-    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
-end
-
+-- 9. LOGIC: TAB NAVIGATION
 local function showTab(tab)
     MonitorTab.Visible = false; ShieldTab.Visible = false; SettingsTab.Visible = false
     tab.Visible = true
@@ -292,21 +275,19 @@ local function performMovement()
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
     if hum and root then
-        shieldLog("Human Movement Triggered", Color3.new(1, 0.8, 0))
-        local originalPos = root.Position
-        local randX = math.random(-8, 8)
-        local randZ = math.random(-8, 8)
+        local directions = {
+            root.CFrame.LookVector, -- Forward
+            -root.CFrame.LookVector, -- Backward
+            -root.CFrame.RightVector, -- Left
+            root.CFrame.RightVector -- Right
+        }
+        local dirNames = {"Forward", "Backward", "Left", "Right"}
+        local randomIndex = math.random(1, #directions)
         
-        hum:MoveTo(originalPos + Vector3.new(randX, 0, randZ))
-        
-        -- Random Jump (Human touch)
-        if math.random(1, 2) == 1 then 
-            task.wait(0.5)
-            hum.Jump = true 
-        end
-        
-        task.wait(2)
-        hum:MoveTo(originalPos)
+        shieldLog("Walking " .. dirNames[randomIndex] .. "...", Color3.new(1, 1, 0))
+        hum:Move(directions[randomIndex])
+        task.wait(1.5)
+        hum:Move(Vector3.new(0,0,0))
     end
 end
 
@@ -321,22 +302,24 @@ end)
 
 CloseBtn.MouseButton1Click:Connect(function() _G.WatchdogRunning = false; ScreenGui:Destroy() end)
 
-monitorToggleBtn.MouseButton1Click:Connect(function()
+hbToggleBtn.MouseButton1Click:Connect(function()
     monitorActive = not monitorActive
-    monitorToggleBtn.Text = monitorActive and "MONITOR: ON" or "MONITOR: OFF"
-    monitorToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 120, 70) or Color3.fromRGB(50, 50, 60)
     mySettings.MonitorEnabled = monitorActive
+    hbToggleBtn.Text = monitorActive and "HB: ON" or "HB: OFF"
+    hbToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 100, 50) or Color3.fromRGB(100, 0, 0)
+    timerLabel.TextColor3 = monitorActive and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 50, 50)
+    monitorStatus.Text = "Heartbeat: "..(monitorActive and "Enabled" or "Disabled").."\nUptime: " .. os.date("!%X", os.time() - startTime)
     if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
-    shieldLog("Monitor " .. (monitorActive and "Enabled" or "Disabled"), Color3.new(1,1,1))
 end)
 
-testBtn.MouseButton1Click:Connect(function() 
-    if monitorActive then
-        sendWebhook("🧪 Test", "Integrated System Working!", 10181046, false) 
-    else
-        shieldLog("Enable Monitor to test!", Color3.new(1,0,0))
-    end
+local themes = {Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 50), Color3.fromRGB(180, 50, 255), Color3.fromRGB(255, 200, 0)}
+local themeIdx = 1
+themeB.MouseButton1Click:Connect(function()
+    themeIdx = themeIdx >= #themes and 1 or themeIdx + 1
+    updateUITheme(themes[themeIdx])
 end)
+
+testBtn.MouseButton1Click:Connect(function() sendWebhook("🧪 Test", "Integrated System Working!", 10181046, false) end)
 
 afkBtn.MouseButton1Click:Connect(function()
     antiAfkActive = not antiAfkActive
@@ -353,16 +336,10 @@ rjnBtn.MouseButton1Click:Connect(function()
     if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
 end)
 
-colorB.MouseButton1Click:Connect(function()
-    themeIdx = themeIdx + 1
-    if themeIdx > #themes then themeIdx = 1 end
-    updateTheme(themes[themeIdx])
-end)
-
 afkInput.FocusLost:Connect(function()
     local n = tonumber(afkInput.Text)
     if n then
-        mySettings.AntiAfkTime = math.clamp(n, 15, 1100)
+        mySettings.AntiAfkTime = math.clamp(n, 10, 1100)
         currentAfkInterval = mySettings.AntiAfkTime
         shieldLog("AFK set to " .. n .. "s", Color3.new(0,1,1))
         if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
@@ -414,7 +391,7 @@ end)
 -- Heartbeat Loop
 task.spawn(function()
     if globalSet.LastBuild ~= "6.2.0" then
-        sendWebhook("📜 Monitor System Updated: 6.2.0", "• Human Movement System\n• Monitor Toggle Added\n• UI Theme cycling added\n• Fixed unpack(nil) errors", 16763904, true)
+        sendWebhook("📜 Monitor System Updated: 6.2.0", "• Humanoid Movement (WASD relative)\n• Monitor ON/OFF Toggle\n• Persistent UI Themes\n• Bug Fixes for Save System", 16763904, true)
         globalSet.LastBuild = "6.2.0"
         if writefile then writefile(GLOBAL_FILE, HttpService:JSONEncode(globalSet)) end
     end
@@ -424,9 +401,14 @@ task.spawn(function()
         local timeLeft = HEARTBEAT_INTERVAL
         forceRestartLoop = false
         while timeLeft > 0 and _G.WatchdogRunning and not forceRestartLoop do
-            timerLabel.Text = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
-            monitorStatus.Text = "Heartbeat: Active\nUptime: " .. os.date("!%X", os.time() - startTime)
-            task.wait(1); timeLeft = timeLeft - 1
+            if monitorActive then
+                timerLabel.Text = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
+                timeLeft = timeLeft - 1
+            else
+                timerLabel.Text = "PAUSED"
+            end
+            monitorStatus.Text = "Heartbeat: "..(monitorActive and "Enabled" or "Disabled").."\nUptime: " .. os.date("!%X", os.time() - startTime)
+            task.wait(1)
         end
         if _G.WatchdogRunning and not forceRestartLoop and monitorActive then 
             sendWebhook("🔄 Heartbeat", "Stable.", 1752220, false) 
