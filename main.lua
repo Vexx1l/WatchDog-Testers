@@ -1,4 +1,4 @@
--- [[ WATCHDOG & HEARTBEAT FUSION V6.0 ]] --
+-- [[ WATCHDOG & HEARTBEAT FUSION V6.0.0 ]] --
 -- [[ ALL-IN-ONE PERFORMANCE SUITE ]] --
 
 if not game:IsLoaded() then game.Loaded:Wait() end
