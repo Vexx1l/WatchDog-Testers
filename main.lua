@@ -1,7 +1,6 @@
--- WATCHDOG SENTINEL ULTRA [FUSED BUILD 6.0]
--- Heartbeat v5.8.6 + Watchdog Shield v5.2
+-- [[ WATCHDOG INTEGRATED - VERSION 6.0.0 ]] --
+-- [[ Fused Heartbeat V2 + Watchdog Shield ]] --
 
--- [[ 0. INITIALIZATION & AUTO-LOAD ]] --
 if not game:IsLoaded() then game.Loaded:Wait() end
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
@@ -12,66 +11,78 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Prevent Double Running
-if _G.SentinelRunning then 
-    _G.SentinelRunning = false 
-    task.wait(0.5) 
+-- 1. PRE-EXECUTION CLEANUP
+local function deepClean()
+    pcall(function()
+        for _, p in pairs({game:GetService("CoreGui"), player:FindFirstChild("PlayerGui")}) do
+            if p then 
+                for _, c in pairs(p:GetChildren()) do
+                    if c.Name == "WatchdogIntegratedUI" then c:Destroy() end
+                end 
+            end
+        end
+    end)
 end
-_G.SentinelRunning = true
+deepClean()
+
+-- 2. GLOBAL STATE & CONFIG
+if _G.WatchdogRunning then _G.WatchdogRunning = false task.wait(0.5) end
+_G.WatchdogRunning = true
 local SESSION_ID = tick()
 _G.CurrentSession = SESSION_ID
 
--- [[ 1. CONFIGURATION & DATABASE ]] --
-local LOCAL_FILE = "WatchdogSentinel_" .. player.Name .. ".json"
-local function loadSettings()
-    local default = {
-        Timer = 600, 
-        Webhook = "PASTE_WEBHOOK_HERE", 
-        UserID = "958143880291823647",
-        AntiAfkInterval = 300,
-        AutoRejoin = false
-    }
-    if isfile and isfile(LOCAL_FILE) then
-        local s, d = pcall(function() return HttpService:JSONDecode(readfile(LOCAL_FILE)) end)
+local GLOBAL_FILE = "Watchdog_GLOBAL.json"
+local LOCAL_FILE = "Watchdog_" .. player.Name .. ".json"
+
+local function loadData(file, default)
+    if isfile and isfile(file) then
+        local s, d = pcall(function() return HttpService:JSONDecode(readfile(file)) end)
         if s then return d end
     end
     return default
 end
 
-local mySettings = loadSettings()
+local mySettings = loadData(LOCAL_FILE, {
+    Timer = 600, 
+    Webhook = "PASTE_WEBHOOK_HERE", 
+    UserID = "958143880291823647",
+    AntiAfkTime = 300,
+    AutoRejoin = false
+})
+
+-- Heartbeat Logic Variables
 local HEARTBEAT_INTERVAL = mySettings.Timer
 local WEBHOOK_URL = mySettings.Webhook:gsub("%s+", "")
 local DISCORD_USER_ID = mySettings.UserID
 local startTime = os.time()
-
--- State Variables
-local activeAntiAfk = false
-local currentAfkInterval = mySettings.AntiAfkInterval
-local lastAfkAction = tick()
 local isBlocked = false
 local blockExpires = 0
+local forceRestartLoop = false
 
--- [[ 2. CORE WEBHOOK LOGIC (HEARTBEAT) ]] --
-local function getUptimeString()
-    local diff = os.time() - startTime
-    return string.format("%dh %dm %ds", math.floor(diff/3600), math.floor((diff%3600)/60), diff%60)
-end
+-- Shield Logic Variables
+local antiAfkActive = false
+local autoRejoinActive = mySettings.AutoRejoin
+local lastAfkAction = tick()
+local currentAfkInterval = mySettings.AntiAfkTime
 
-local function sendWebhook(title, reason, color)
-    if WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.SentinelRunning then return end
+-- 3. WEBHOOK CORE (With 429 Protection)
+local function sendWebhook(title, reason, color, isUpdateLog)
+    if WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
     if isBlocked and tick() < blockExpires then return end
+    isBlocked = false
 
     local payload = HttpService:JSONEncode({
-        content = (title ~= "🔄 Heartbeat") and "<@" .. DISCORD_USER_ID .. ">" or nil,
+        content = (not isUpdateLog and title ~= "🔄 Heartbeat") and "<@" .. DISCORD_USER_ID .. ">" or nil,
         embeds = {{
             title = title,
             color = color or 1752220,
             timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-            fields = {
+            description = isUpdateLog and reason or "Status for **" .. player.Name .. "**",
+            fields = not isUpdateLog and {
                 { name = "🎮 Game", value = MarketplaceService:GetProductInfo(game.PlaceId).Name or "Unknown", inline = true },
-                { name = "📊 Session", value = "Uptime: " .. getUptimeString(), inline = true },
+                { name = "📊 Uptime", value = os.date("!%X", os.time() - startTime), inline = true },
                 { name = "💬 Status", value = "```" .. reason .. "```", inline = false }
-            }
+            } or nil
         }}
     })
 
@@ -89,243 +100,240 @@ local function sendWebhook(title, reason, color)
     end
 end
 
--- [[ 3. CORE MOVEMENT LOGIC (WATCHDOG) ]] --
+-- 4. UI CREATION (Integrated Version 6.0.0)
+local ScreenGui = Instance.new("ScreenGui", (game:GetService("CoreGui") or player.PlayerGui))
+ScreenGui.Name = "WatchdogIntegratedUI"
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 300, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -150, 0.4, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+MainFrame.BorderSizePixel = 0
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+local Stroke = Instance.new("UIStroke", MainFrame); Stroke.Color = Color3.fromRGB(0, 170, 255); Stroke.Thickness = 2
+
+-- Top Bar
+local TopBar = Instance.new("Frame", MainFrame)
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+TopBar.BackgroundTransparency = 1
+
+local Title = Instance.new("TextLabel", TopBar)
+Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG INTEGRATED v6.0.0"; Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold; Title.TextSize = 12; Title.BackgroundTransparency = 1
+
+local CloseBtn = Instance.new("TextButton", TopBar); CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 2)
+CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.new(1,0,0); CloseBtn.BackgroundTransparency = 1; CloseBtn.Font = Enum.Font.GothamBold
+
+local MinBtn = Instance.new("TextButton", TopBar); MinBtn.Size = UDim2.new(0, 30, 0, 30); MinBtn.Position = UDim2.new(0, 5, 0, 2)
+MinBtn.Text = "-"; MinBtn.TextColor3 = Color3.new(0,1,1); MinBtn.BackgroundTransparency = 1; MinBtn.Font = Enum.Font.GothamBold
+
+-- Tab System
+local TabContainer = Instance.new("Frame", MainFrame)
+TabContainer.Size = UDim2.new(1, -20, 1, -85); TabContainer.Position = UDim2.new(0, 10, 0, 40); TabContainer.BackgroundTransparency = 1
+
+local Nav = Instance.new("Frame", MainFrame)
+Nav.Size = UDim2.new(1, 0, 0, 35); Nav.Position = UDim2.new(0, 0, 1, -35); Nav.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+
+local function createTab(name)
+    local f = Instance.new("Frame", TabContainer); f.Size = UDim2.new(1, 0, 1, 0); f.Visible = false; f.BackgroundTransparency = 1
+    return f
+end
+
+local MonitorTab = createTab("Monitor")
+local ShieldTab = createTab("Shield")
+local SettingsTab = createTab("Settings")
+
+-- 5. CONTENT: MONITOR TAB
+local timerLabel = Instance.new("TextLabel", MonitorTab)
+timerLabel.Size = UDim2.new(1, 0, 0, 60); timerLabel.Position = UDim2.new(0, 0, 0.1, 0)
+timerLabel.Text = "00:00"; timerLabel.TextColor3 = Color3.fromRGB(0, 170, 255); timerLabel.TextSize = 40; timerLabel.Font = Enum.Font.GothamBold; timerLabel.BackgroundTransparency = 1
+
+local monitorStatus = Instance.new("TextLabel", MonitorTab)
+monitorStatus.Size = UDim2.new(0.9, 0, 0, 40); monitorStatus.Position = UDim2.new(0.05, 0, 0.45, 0)
+monitorStatus.BackgroundColor3 = Color3.fromRGB(30, 30, 35); monitorStatus.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+monitorStatus.Text = "Heartbeat: Active\nUptime: 0h 0m"; monitorStatus.Font = Enum.Font.Code; monitorStatus.TextSize = 12
+Instance.new("UICorner", monitorStatus)
+
+local testBtn = Instance.new("TextButton", MonitorTab)
+testBtn.Size = UDim2.new(0.4, 0, 0, 35); testBtn.Position = UDim2.new(0.3, 0, 0.75, 0)
+testBtn.Text = "SEND TEST"; testBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50); testBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", testBtn)
+
+-- 6. CONTENT: SHIELD TAB
+local shieldStatus = Instance.new("TextLabel", ShieldTab)
+shieldStatus.Size = UDim2.new(0.9, 0, 0, 40); shieldStatus.Position = UDim2.new(0.05, 0, 0, 0)
+shieldStatus.BackgroundColor3 = Color3.fromRGB(20, 20, 25); shieldStatus.TextColor3 = Color3.new(0, 1, 0.8); shieldStatus.Text = "Shield: STANDBY"; shieldStatus.Font = Enum.Font.Code; shieldStatus.TextSize = 11
+
+local afkBtn = Instance.new("TextButton", ShieldTab)
+afkBtn.Size = UDim2.new(0.44, 0, 0, 40); afkBtn.Position = UDim2.new(0.05, 0, 0.25, 0)
+afkBtn.Text = "ANTI-AFK: OFF"; afkBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60); afkBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", afkBtn)
+
+local rjnBtn = Instance.new("TextButton", ShieldTab)
+rjnBtn.Size = UDim2.new(0.44, 0, 0, 40); rjnBtn.Position = UDim2.new(0.51, 0, 0.25, 0)
+rjnBtn.Text = "REJOIN: OFF"; rjnBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60); rjnBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", rjnBtn)
+
+local afkInput = Instance.new("TextBox", ShieldTab)
+afkInput.Size = UDim2.new(0.9, 0, 0, 30); afkInput.Position = UDim2.new(0.05, 0, 0.45, 0)
+afkInput.PlaceholderText = "AFK Interval (Seconds)"; afkInput.Text = tostring(mySettings.AntiAfkTime); afkInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35); afkInput.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", afkInput)
+
+local feed = Instance.new("ScrollingFrame", ShieldTab)
+feed.Size = UDim2.new(0.9, 0, 0, 70); feed.Position = UDim2.new(0.05, 0, 0.65, 0); feed.BackgroundColor3 = Color3.new(0,0,0); feed.CanvasSize = UDim2.new(0,0,0,0)
+local feedList = Instance.new("UIListLayout", feed)
+
+-- 7. CONTENT: SETTINGS TAB
+local function createSetBtn(name, pos, color)
+    local b = Instance.new("TextButton", SettingsTab); b.Size = UDim2.new(0.44, 0, 0, 35); b.Position = pos; b.Text = name; b.BackgroundColor3 = Color3.fromRGB(35, 35, 45); b.TextColor3 = color; b.Font = Enum.Font.GothamBold; b.TextSize = 10; Instance.new("UICorner", b); return b
+end
+
+local timeB = createSetBtn("SET TIMER", UDim2.new(0.05, 0, 0, 0), Color3.new(0, 1, 0.5))
+local cfgB = createSetBtn("WEBHOOK/ID", UDim2.new(0.51, 0, 0, 0), Color3.new(1, 0.7, 0))
+local hubB = createSetBtn("WATCHDOG HUB", UDim2.new(0.05, 0, 0.25, 0), Color3.new(0.7, 0.5, 1))
+local resetB = createSetBtn("FULL RESET", UDim2.new(0.51, 0, 0.25, 0), Color3.new(1, 0.2, 0))
+
+-- 8. OVERLAYS (For inputs)
+local function createOverlay(placeholder)
+    local o = Instance.new("Frame", MainFrame); o.Size = UDim2.new(1,0,1,0); o.BackgroundColor3 = Color3.fromRGB(15, 15, 20); o.Visible = false; o.ZIndex = 10; Instance.new("UICorner", o)
+    local t = Instance.new("TextBox", o); t.Size = UDim2.new(0.8, 0, 0.2, 0); t.Position = UDim2.new(0.1, 0, 0.3, 0); t.PlaceholderText = placeholder; t.BackgroundColor3 = Color3.fromRGB(30,30,40); t.TextColor3 = Color3.new(1,1,1); t.ZIndex = 11; Instance.new("UICorner", t)
+    local c = Instance.new("TextButton", o); c.Size = UDim2.new(0.8, 0, 0.2, 0); c.Position = UDim2.new(0.1, 0, 0.6, 0); c.Text = "CONFIRM"; c.BackgroundColor3 = Color3.fromRGB(0, 170, 255); c.ZIndex = 11; Instance.new("UICorner", c)
+    local b = Instance.new("TextButton", o); b.Size = UDim2.new(0, 30, 0, 30); b.Position = UDim2.new(0, 10, 0, 5); b.Text = "<-"; b.TextColor3 = Color3.new(1,1,1); b.BackgroundTransparency = 1; b.ZIndex = 11
+    b.MouseButton1Click:Connect(function() o.Visible = false end)
+    return o, t, c
+end
+
+local timeO, timeI, timeC = createOverlay("Interval in Minutes")
+local webO, webI, webC = createOverlay("Webhook URL")
+local idO, idI, idC = createOverlay("Discord User ID")
+
+-- 9. LOGIC: TAB NAVIGATION
+local function showTab(tab)
+    MonitorTab.Visible = false; ShieldTab.Visible = false; SettingsTab.Visible = false
+    tab.Visible = true
+end
+showTab(MonitorTab)
+
+local function navBtn(name, x)
+    local b = Instance.new("TextButton", Nav); b.Size = UDim2.new(0.33, 0, 1, 0); b.Position = UDim2.new(x, 0, 0, 0); b.Text = name; b.BackgroundColor3 = Color3.fromRGB(30, 30, 35); b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.GothamBold; b.TextSize = 10; b.BorderSizePixel = 0
+    return b
+end
+
+navBtn("MONITOR", 0).MouseButton1Click:Connect(function() showTab(MonitorTab) end)
+navBtn("SHIELD", 0.33).MouseButton1Click:Connect(function() showTab(ShieldTab) end)
+navBtn("SETTINGS", 0.66).MouseButton1Click:Connect(function() showTab(SettingsTab) end)
+
+-- 10. LOGIC: SHIELD ACTIONS
+local function shieldLog(msg, col)
+    local l = Instance.new("TextLabel", feed); l.Size = UDim2.new(1, 0, 0, 18); l.Text = "[" .. os.date("%X") .. "] " .. msg; l.TextColor3 = col or Color3.new(1,1,1); l.BackgroundTransparency = 1; l.TextSize = 10; l.Font = Enum.Font.Code
+    feed.CanvasSize = UDim2.new(0, 0, 0, feedList.AbsoluteContentSize.Y)
+    feed.CanvasPosition = Vector2.new(0, feed.CanvasSize.Y.Offset)
+end
+
 local function performMovement()
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if hum and root then
-        local startPos = root.Position
-        hum:MoveTo(startPos + (root.CFrame.LookVector * 10))
-        task.wait(2)
-        hum:MoveTo(startPos)
+        shieldLog("Anti-AFK Movement...", Color3.new(1, 1, 0))
+        local old = root.Position; hum:MoveTo(old + Vector3.new(5, 0, 5))
+        task.wait(2); hum:MoveTo(old)
     end
 end
 
--- [[ 4. MODERN UI CONSTRUCTION ]] --
-local screenGui = Instance.new("ScreenGui", (game:GetService("CoreGui") or player.PlayerGui))
-screenGui.Name = "WatchdogSentinelUI"
-screenGui.ResetOnSpawn = false
+-- 11. CONNECTIONS
+CloseBtn.MouseButton1Click:Connect(function() _G.WatchdogRunning = false; ScreenGui:Destroy() end)
 
-local main = Instance.new("Frame", screenGui)
-main.Size = UDim2.new(0, 300, 0, 350)
-main.Position = UDim2.new(0.5, -150, 0.5, -175)
-main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-main.BorderSizePixel = 0
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
-local stroke = Instance.new("UIStroke", main); stroke.Color = Color3.fromRGB(0, 170, 255); stroke.Thickness = 2
+testBtn.MouseButton1Click:Connect(function() sendWebhook("🧪 Test", "Integrated System Working!", 10181046, false) end)
 
--- Top Bar
-local topBar = Instance.new("Frame", main)
-topBar.Size = UDim2.new(1, 0, 0, 40)
-topBar.BackgroundTransparency = 1
-
-local title = Instance.new("TextLabel", topBar)
-title.Size = UDim2.new(1, 0, 1, 0); title.Text = "WATCHDOG SENTINEL ULTRA"; title.TextColor3 = Color3.new(1,1,1); title.Font = Enum.Font.GothamBold; title.TextSize = 12; title.BackgroundTransparency = 1
-
-local minBtn = Instance.new("TextButton", topBar)
-minBtn.Size = UDim2.new(0, 30, 0, 30); minBtn.Position = UDim2.new(0, 5, 0, 5); minBtn.Text = "-"; minBtn.TextColor3 = Color3.new(0,1,1); minBtn.BackgroundTransparency = 1; minBtn.TextSize = 25
-
-local closeBtn = Instance.new("TextButton", topBar)
-closeBtn.Size = UDim2.new(0, 30, 0, 30); closeBtn.Position = UDim2.new(1, -35, 0, 5); closeBtn.Text = "✕"; closeBtn.TextColor3 = Color3.fromRGB(255, 80, 80); closeBtn.BackgroundTransparency = 1; closeBtn.TextSize = 18
-
--- Tab System
-local tabFrame = Instance.new("Frame", main)
-tabFrame.Size = UDim2.new(1, -20, 0, 30); tabFrame.Position = UDim2.new(0, 10, 0, 45); tabFrame.BackgroundTransparency = 1
-
-local function createTabBtn(name, pos)
-    local btn = Instance.new("TextButton", tabFrame)
-    btn.Size = UDim2.new(0.3, 0, 1, 0); btn.Position = pos; btn.Text = name; btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40); btn.TextColor3 = Color3.new(1,1,1); btn.Font = Enum.Font.GothamBold; btn.TextSize = 10
-    Instance.new("UICorner", btn)
-    return btn
-end
-
-local t1 = createTabBtn("MONITOR", UDim2.new(0, 0, 0, 0))
-local t2 = createTabBtn("SHIELD", UDim2.new(0.35, 0, 0, 0))
-local t3 = createTabBtn("CONFIG", UDim2.new(0.7, 0, 0, 0))
-
--- Containers
-local content = Instance.new("Frame", main)
-content.Size = UDim2.new(1, -20, 1, -90); content.Position = UDim2.new(0, 10, 0, 80); content.BackgroundTransparency = 1
-
-local monitorPage = Instance.new("Frame", content); monitorPage.Size = UDim2.new(1,0,1,0); monitorPage.BackgroundTransparency = 1
-local shieldPage = Instance.new("Frame", content); shieldPage.Size = UDim2.new(1,0,1,0); shieldPage.BackgroundTransparency = 1; shieldPage.Visible = false
-local configPage = Instance.new("ScrollingFrame", content); configPage.Size = UDim2.new(1,0,1,0); configPage.BackgroundTransparency = 1; configPage.Visible = false; configPage.CanvasSize = UDim2.new(0,0,1.5,0); configPage.ScrollBarThickness = 0
-
--- [[ 5. TAB: MONITOR (Heartbeat Features) ]] --
-local timerDisp = Instance.new("TextLabel", monitorPage)
-timerDisp.Size = UDim2.new(1, 0, 0, 60); timerDisp.Text = "00:00"; timerDisp.TextColor3 = Color3.fromRGB(0, 170, 255); timerDisp.TextSize = 40; timerDisp.Font = Enum.Font.GothamBold; timerDisp.BackgroundTransparency = 1
-
-local testBtn = Instance.new("TextButton", monitorPage)
-testBtn.Size = UDim2.new(0.9, 0, 0, 40); testBtn.Position = UDim2.new(0.05, 0, 0.4, 0); testBtn.Text = "SEND TEST HEARTBEAT"; testBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50); testBtn.TextColor3 = Color3.new(1,1,1); testBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", testBtn)
-
-local hubBtn = Instance.new("TextButton", monitorPage)
-hubBtn.Size = UDim2.new(0.9, 0, 0, 40); hubBtn.Position = UDim2.new(0.05, 0, 0.6, 0); hubBtn.Text = "COPY HUB LINKS"; hubBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50); hubBtn.TextColor3 = Color3.fromRGB(200, 100, 255); hubBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", hubBtn)
-
--- [[ 6. TAB: SHIELD (Watchdog Shield Features) ]] --
-local shieldStats = Instance.new("TextLabel", shieldPage)
-shieldStats.Size = UDim2.new(1, 0, 0, 60); shieldStats.Text = "Status: STANDBY\nRejoin: OFF"; shieldStats.TextColor3 = Color3.new(1,1,1); shieldStats.TextSize = 14; shieldStats.Font = Enum.Font.Code; shieldStats.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Instance.new("UICorner", shieldStats)
-
-local afkToggle = Instance.new("TextButton", shieldPage)
-afkToggle.Size = UDim2.new(0.9, 0, 0, 45); afkToggle.Position = UDim2.new(0.05, 0, 0.35, 0); afkToggle.Text = "ANTI-AFK: OFF"; afkToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50); afkToggle.TextColor3 = Color3.new(1,1,1); afkToggle.Font = Enum.Font.GothamBold
-Instance.new("UICorner", afkToggle)
-
-local rejoinToggle = Instance.new("TextButton", shieldPage)
-rejoinToggle.Size = UDim2.new(0.9, 0, 0, 45); rejoinToggle.Position = UDim2.new(0.05, 0, 0.55, 0); rejoinToggle.Text = "AUTO-REJOIN: OFF"; rejoinToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50); rejoinToggle.TextColor3 = Color3.new(1,1,1); rejoinToggle.Font = Enum.Font.GothamBold
-Instance.new("UICorner", rejoinToggle)
-
-local afkTimeInput = Instance.new("TextBox", shieldPage)
-afkTimeInput.Size = UDim2.new(0.9, 0, 0, 30); afkTimeInput.Position = UDim2.new(0.05, 0, 0.8, 0); afkTimeInput.PlaceholderText = "Movement Interval (Secs)"; afkTimeInput.Text = tostring(mySettings.AntiAfkInterval); afkTimeInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35); afkTimeInput.TextColor3 = Color3.new(0,1,1)
-Instance.new("UICorner", afkTimeInput)
-
--- [[ 7. TAB: CONFIG (Settings & Reset) ]] --
-local function createConfigInput(label, val, pos)
-    local lab = Instance.new("TextLabel", configPage); lab.Size = UDim2.new(1, 0, 0, 20); lab.Position = pos; lab.Text = label; lab.TextColor3 = Color3.new(0.7, 0.7, 0.7); lab.TextSize = 10; lab.BackgroundTransparency = 1; lab.Font = Enum.Font.GothamBold
-    local inp = Instance.new("TextBox", configPage); inp.Size = UDim2.new(0.9, 0, 0, 30); inp.Position = pos + UDim2.new(0.05, 0, 0, 22); inp.Text = tostring(val); inp.BackgroundColor3 = Color3.fromRGB(30, 30, 35); inp.TextColor3 = Color3.new(1,1,1); inp.ClearTextOnFocus = false
-    Instance.new("UICorner", inp); return inp
-end
-
-local hbInput = createConfigInput("Heartbeat Interval (Seconds)", HEARTBEAT_INTERVAL, UDim2.new(0, 0, 0, 0))
-local webInput = createConfigInput("Webhook URL", WEBHOOK_URL, UDim2.new(0, 0, 0, 60))
-local userInput = createConfigInput("Discord User ID", DISCORD_USER_ID, UDim2.new(0, 0, 0, 120))
-
-local saveBtn = Instance.new("TextButton", configPage)
-saveBtn.Size = UDim2.new(0.9, 0, 0, 35); saveBtn.Position = UDim2.new(0.05, 0, 0, 185); saveBtn.Text = "SAVE CONFIGURATION"; saveBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80); saveBtn.TextColor3 = Color3.new(1,1,1); saveBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", saveBtn)
-
-local resetBtn = Instance.new("TextButton", configPage)
-resetBtn.Size = UDim2.new(0.9, 0, 0, 35); resetBtn.Position = UDim2.new(0.05, 0, 0, 230); resetBtn.Text = "FACTORY RESET"; resetBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50); resetBtn.TextColor3 = Color3.new(1,1,1); resetBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", resetBtn)
-
--- [[ 8. UI LOGIC & TWEENING ]] --
-local function showPage(page)
-    monitorPage.Visible = (page == monitorPage)
-    shieldPage.Visible = (page == shieldPage)
-    configPage.Visible = (page == configPage)
-end
-t1.MouseButton1Click:Connect(function() showPage(monitorPage) end)
-t2.MouseButton1Click:Connect(function() showPage(shieldPage) end)
-t3.MouseButton1Click:Connect(function() showPage(configPage) end)
-
-local minimized = false
-minBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    content.Visible = not minimized
-    tabFrame.Visible = not minimized
-    main:TweenSize(minimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 350), "Out", "Quad", 0.3, true)
-    minBtn.Text = minimized and "+" or "-"
-end)
-
-closeBtn.MouseButton1Click:Connect(function() _G.SentinelRunning = false; screenGui:Destroy() end)
-
--- Save Logic
-saveBtn.MouseButton1Click:Connect(function()
-    mySettings.Timer = tonumber(hbInput.Text) or 600
-    mySettings.Webhook = webInput.Text:gsub("%s+", "")
-    mySettings.UserID = userInput.Text
-    mySettings.AntiAfkInterval = tonumber(afkTimeInput.Text) or 300
-    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
-    HEARTBEAT_INTERVAL = mySettings.Timer
-    WEBHOOK_URL = mySettings.Webhook
-    DISCORD_USER_ID = mySettings.UserID
-    saveBtn.Text = "SAVED!"
-    task.wait(1)
-    saveBtn.Text = "SAVE CONFIGURATION"
-end)
-
-resetBtn.MouseButton1Click:Connect(function()
-    if isfile(LOCAL_FILE) then delfile(LOCAL_FILE) end
-    player:Kick("Sentinel Reset Complete. Please Re-Execute.")
-end)
-
--- Shield Controls
-afkToggle.MouseButton1Click:Connect(function()
-    activeAntiAfk = not activeAntiAfk
-    afkToggle.Text = activeAntiAfk and "ANTI-AFK: ACTIVE" or "ANTI-AFK: OFF"
-    afkToggle.BackgroundColor3 = activeAntiAfk and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(50, 50, 50)
+afkBtn.MouseButton1Click:Connect(function()
+    antiAfkActive = not antiAfkActive
+    afkBtn.Text = antiAfkActive and "ANTI-AFK: ON" or "ANTI-AFK: OFF"
+    afkBtn.BackgroundColor3 = antiAfkActive and Color3.fromRGB(0, 120, 70) or Color3.fromRGB(50, 50, 60)
     lastAfkAction = tick()
 end)
 
-rejoinToggle.MouseButton1Click:Connect(function()
-    mySettings.AutoRejoin = not mySettings.AutoRejoin
-    rejoinToggle.Text = mySettings.AutoRejoin and "AUTO-REJOIN: ON" or "AUTO-REJOIN: OFF"
-    rejoinToggle.BackgroundColor3 = mySettings.AutoRejoin and Color3.fromRGB(0, 100, 200) or Color3.fromRGB(50, 50, 50)
+rjnBtn.MouseButton1Click:Connect(function()
+    autoRejoinActive = not autoRejoinActive
+    rjnBtn.Text = autoRejoinActive and "REJOIN: ON" or "REJOIN: OFF"
+    rjnBtn.BackgroundColor3 = autoRejoinActive and Color3.fromRGB(0, 80, 150) or Color3.fromRGB(50, 50, 60)
+    mySettings.AutoRejoin = autoRejoinActive
+    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
 end)
 
--- [[ 9. CORE LOOPS ]] --
+timeB.MouseButton1Click:Connect(function() timeO.Visible = true end)
+timeC.MouseButton1Click:Connect(function() 
+    local n = tonumber(timeI.Text); if n then HEARTBEAT_INTERVAL = n * 60; mySettings.Timer = n * 60; forceRestartLoop = true end
+    timeO.Visible = false; if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
+end)
 
--- Rejoin & Webhook Disconnect Error
+cfgB.MouseButton1Click:Connect(function() webO.Visible = true end)
+webC.MouseButton1Click:Connect(function() 
+    WEBHOOK_URL = webI.Text:gsub("%s+", ""); mySettings.Webhook = WEBHOOK_URL; webO.Visible = false; idO.Visible = true 
+end)
+idC.MouseButton1Click:Connect(function() 
+    DISCORD_USER_ID = idI.Text; mySettings.UserID = idI.Text; idO.Visible = false
+    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
+    sendWebhook("✅ Watchdog Config", "System Linked Successfully.", 3066993, false)
+end)
+
+resetB.MouseButton1Click:Connect(function()
+    if isfile(LOCAL_FILE) then delfile(LOCAL_FILE) end
+    player:Kick("Watchdog Reset complete. Re-execute script.")
+end)
+
+-- 12. CORE LOOPS
+player.Idled:Connect(function()
+    if antiAfkActive then
+        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(0.1); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end
+end)
+
 GuiService.ErrorMessageChanged:Connect(function()
-    if _G.SentinelRunning and _G.CurrentSession == SESSION_ID then
+    if _G.WatchdogRunning and _G.CurrentSession == SESSION_ID then
         local msg = GuiService:GetErrorMessage()
-        if msg and #msg > 1 and not msg:lower():find("teleport") then 
-            sendWebhook("🚨 ALERT: Client Disconnected", "Error: " .. msg, 15548997)
-            if mySettings.AutoRejoin then
-                task.wait(5)
-                TeleportService:Teleport(game.PlaceId, player)
-            end
+        if not msg:lower():find("teleport") then
+            sendWebhook("🚨 Watchdog Alert", "Client Disconnected: " .. msg, 15548997, false)
+            if autoRejoinActive then task.wait(5); TeleportService:Teleport(game.PlaceId, player) end
         end
     end
 end)
 
 -- Heartbeat Loop
 task.spawn(function()
-    sendWebhook("🔄 Heartbeat", "Sentinel Active.", 1752220)
-    while _G.SentinelRunning and _G.CurrentSession == SESSION_ID do
+    sendWebhook("🔄 Integrated Watchdog", "System Online v6.0.0", 1752220, false)
+    while _G.WatchdogRunning and _G.CurrentSession == SESSION_ID do
         local timeLeft = HEARTBEAT_INTERVAL
-        while timeLeft > 0 and _G.SentinelRunning and _G.CurrentSession == SESSION_ID do
-            timerDisp.Text = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
+        forceRestartLoop = false
+        while timeLeft > 0 and _G.WatchdogRunning and not forceRestartLoop do
+            timerLabel.Text = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
+            monitorStatus.Text = "Heartbeat: Active\nUptime: " .. os.date("!%X", os.time() - startTime)
             task.wait(1); timeLeft = timeLeft - 1
         end
-        if _G.SentinelRunning then sendWebhook("🔄 Heartbeat", "Stable.", 1752220) end
+        if _G.WatchdogRunning and not forceRestartLoop then sendWebhook("🔄 Heartbeat", "Stable.", 1752220, false) end
     end
 end)
 
 -- Shield Loop
 task.spawn(function()
-    while _G.SentinelRunning and _G.CurrentSession == SESSION_ID do
-        if activeAntiAfk then
-            local timeLeft = math.ceil(mySettings.AntiAfkInterval - (tick() - lastAfkAction))
-            if timeLeft <= 0 then
+    while _G.WatchdogRunning do
+        if antiAfkActive then
+            local afkRemaining = math.ceil(currentAfkInterval - (tick() - lastAfkAction))
+            shieldStatus.Text = string.format("Shield: ACTIVE | Move: %ds\nRejoin: %s", afkRemaining, autoRejoinActive and "ON" or "OFF")
+            if afkRemaining <= 0 then
                 performMovement()
                 lastAfkAction = tick()
+                currentAfkInterval = mySettings.AntiAfkTime + math.random(-15, 15)
             end
-            shieldStats.Text = string.format("Next Move: %ds\nRejoin: %s", timeLeft, mySettings.AutoRejoin and "ACTIVE" or "OFF")
         else
-            shieldStats.Text = "Status: STANDBY\nClick Start to Protect"
+            shieldStatus.Text = "Shield: STANDBY\nAuto-Rejoin: " .. (autoRejoinActive and "ON" or "OFF")
         end
         task.wait(1)
     end
 end)
 
--- Idled Connection
-player.Idled:Connect(function()
-    if activeAntiAfk then
-        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        task.wait(0.1)
-        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-    end
-end)
+-- Dragging Logic
+local dragging, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dragStart = input.Position startPos = MainFrame.Position end end)
+MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then local delta = input.Position - dragStart MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
--- Hub & Dragging
-hubBtn.MouseButton1Click:Connect(function()
-    setclipboard("https://discord.gg/c3F7p2ygPJ")
-    hubBtn.Text = "COPIED DISCORD!"
-    task.wait(1)
-    hubBtn.Text = "COPY HUB LINKS"
-end)
-
-testBtn.MouseButton1Click:Connect(function()
-    sendWebhook("🧪 Test", "Manual Trigger Success", 10181046)
-    testBtn.Text = "SENT!"
-    task.wait(1)
-    testBtn.Text = "SEND TEST HEARTBEAT"
-end)
-
-local dragging, dragInput, dragStart, startPos
-topBar.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dragStart = input.Position startPos = main.Position end end)
-topBar.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then local delta = input.Position - dragStart main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+shieldLog("Watchdog Integrated Loaded", Color3.new(1,1,1))
