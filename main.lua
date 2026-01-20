@@ -59,7 +59,7 @@ local mySettings = loadData(LOCAL_FILE, {
     AntiAfkTime = 300,
     AutoRejoin = false,
     MonitorEnabled = true,
-    ThemeColor = {0, 170, 255} -- Default Blue
+    ThemeColor = {0, 170, 255}
 })
 
 local HEARTBEAT_INTERVAL = mySettings.Timer
@@ -78,8 +78,7 @@ local currentAfkInterval = mySettings.AntiAfkTime
 
 -- 3. WEBHOOK CORE
 local function sendWebhook(title, reason, color, isUpdateLog)
-    if not monitorActive and not isUpdateLog then return end
-    if WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
+    if not monitorActive or WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
     if isBlocked and tick() < blockExpires then return end
     isBlocked = false
 
@@ -137,16 +136,16 @@ MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 
--- THEME SYSTEM
-local currentTheme = Color3.fromRGB(unpack(mySettings.ThemeColor or {0, 170, 255}))
-local Stroke = Instance.new("UIStroke", MainFrame); Stroke.Color = currentTheme; Stroke.Thickness = 2
-
-local function updateUITheme(newColor)
-    currentTheme = newColor
-    Stroke.Color = newColor
-    mySettings.ThemeColor = {math.floor(newColor.R*255), math.floor(newColor.G*255), math.floor(newColor.B*255)}
-    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
+-- UI Theme Logic
+local function getThemeColor()
+    if mySettings.ThemeColor and type(mySettings.ThemeColor) == "table" and #mySettings.ThemeColor == 3 then
+        return Color3.fromRGB(unpack(mySettings.ThemeColor))
+    end
+    return Color3.fromRGB(0, 170, 255)
 end
+
+local Stroke = Instance.new("UIStroke", MainFrame); 
+Stroke.Color = getThemeColor(); Stroke.Thickness = 2
 
 -- Top Bar
 local TopBar = Instance.new("Frame", MainFrame)
@@ -161,7 +160,7 @@ local CloseBtn = Instance.new("TextButton", TopBar); CloseBtn.Size = UDim2.new(0
 CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.new(1,0,0); CloseBtn.BackgroundTransparency = 1; CloseBtn.Font = Enum.Font.GothamBold
 
 local MinBtn = Instance.new("TextButton", TopBar); MinBtn.Size = UDim2.new(0, 30, 0, 30); MinBtn.Position = UDim2.new(0, 5, 0, 2)
-MinBtn.Text = "-"; MinBtn.TextColor3 = Color3.new(0,1,1); MinBtn.BackgroundTransparency = 1; MinBtn.Font = Enum.Font.GothamBold
+MinBtn.Text = "-"; MinBtn.TextColor3 = getThemeColor(); MinBtn.BackgroundTransparency = 1; MinBtn.Font = Enum.Font.GothamBold
 
 -- Content Wrapper
 local Content = Instance.new("Frame", MainFrame)
@@ -184,20 +183,25 @@ local SettingsTab = createTab()
 
 -- 5. CONTENT: MONITOR TAB
 local timerLabel = Instance.new("TextLabel", MonitorTab)
-timerLabel.Size = UDim2.new(1, 0, 0, 60); timerLabel.Position = UDim2.new(0, 0, 0.05, 0)
-timerLabel.Text = "00:00"; timerLabel.TextColor3 = monitorActive and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 50, 50)
-timerLabel.TextSize = 40; timerLabel.Font = Enum.Font.GothamBold; timerLabel.BackgroundTransparency = 1
+timerLabel.Size = UDim2.new(1, 0, 0, 50); timerLabel.Position = UDim2.new(0, 0, 0, 0)
+timerLabel.Text = "00:00"; timerLabel.TextColor3 = getThemeColor(); timerLabel.TextSize = 35; timerLabel.Font = Enum.Font.GothamBold; timerLabel.BackgroundTransparency = 1
+
+local monToggleBtn = Instance.new("TextButton", MonitorTab)
+monToggleBtn.Size = UDim2.new(0.6, 0, 0, 30); monToggleBtn.Position = UDim2.new(0.2, 0, 0.25, 0)
+monToggleBtn.Text = monitorActive and "MONITOR: ON" or "MONITOR: OFF"
+monToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(100, 0, 0)
+monToggleBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", monToggleBtn)
 
 local monitorStatus = Instance.new("TextLabel", MonitorTab)
-monitorStatus.Size = UDim2.new(0.95, 0, 0, 50); monitorStatus.Position = UDim2.new(0.025, 0, 0.4, 0)
+monitorStatus.Size = UDim2.new(0.95, 0, 0, 45); monitorStatus.Position = UDim2.new(0.025, 0, 0.45, 0)
 monitorStatus.BackgroundColor3 = Color3.fromRGB(30, 30, 35); monitorStatus.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-monitorStatus.Text = "Heartbeat: "..(monitorActive and "Enabled" or "Disabled").."\nUptime: 0h 0m"; monitorStatus.Font = Enum.Font.Code; monitorStatus.TextSize = 11
+monitorStatus.Text = "Heartbeat: Active\nUptime: 0h 0m"; monitorStatus.Font = Enum.Font.Code; monitorStatus.TextSize = 10
 Instance.new("UICorner", monitorStatus)
 
-local hbToggleBtn = Instance.new("TextButton", MonitorTab)
-hbToggleBtn.Size = UDim2.new(0.5, 0, 0, 35); hbToggleBtn.Position = UDim2.new(0.25, 0, 0.75, 0)
-hbToggleBtn.Text = monitorActive and "HB: ON" or "HB: OFF"; hbToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 100, 50) or Color3.fromRGB(100, 0, 0); hbToggleBtn.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", hbToggleBtn)
+local testBtn = Instance.new("TextButton", MonitorTab)
+testBtn.Size = UDim2.new(0.5, 0, 0, 30); testBtn.Position = UDim2.new(0.25, 0, 0.75, 0)
+testBtn.Text = "🧪 SEND TEST"; testBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50); testBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", testBtn)
 
 -- 6. CONTENT: SHIELD TAB
 local shieldStatus = Instance.new("TextLabel", ShieldTab)
@@ -228,7 +232,7 @@ end
 local timeB = createSetBtn("HB TIMER", UDim2.new(0.02, 0, 0, 0), Color3.new(0, 1, 0.5))
 local cfgB = createSetBtn("WEBHOOK/ID", UDim2.new(0.52, 0, 0, 0), Color3.new(1, 0.7, 0))
 local botB = createSetBtn("COPY BOT LINK", UDim2.new(0.02, 0, 0.25, 0), Color3.new(0, 0.7, 1))
-local themeB = createSetBtn("CHANGE THEME", UDim2.new(0.52, 0, 0.25, 0), Color3.new(1, 1, 1))
+local themeB = createSetBtn("THEME", UDim2.new(0.52, 0, 0.25, 0), getThemeColor())
 local dscB = createSetBtn("COPY DISCORD", UDim2.new(0.02, 0, 0.5, 0), Color3.new(0.5, 0.5, 1))
 local resetB = createSetBtn("FULL RESET", UDim2.new(0.52, 0, 0.5, 0), Color3.new(1, 0.2, 0))
 
@@ -236,7 +240,7 @@ local resetB = createSetBtn("FULL RESET", UDim2.new(0.52, 0, 0.5, 0), Color3.new
 local function createOverlay(placeholder)
     local o = Instance.new("Frame", MainFrame); o.Size = UDim2.new(1,0,1,0); o.BackgroundColor3 = Color3.fromRGB(15, 15, 20); o.Visible = false; o.ZIndex = 10; Instance.new("UICorner", o)
     local t = Instance.new("TextBox", o); t.Size = UDim2.new(0.8, 0, 0.2, 0); t.Position = UDim2.new(0.1, 0, 0.3, 0); t.PlaceholderText = placeholder; t.BackgroundColor3 = Color3.fromRGB(30,30,40); t.TextColor3 = Color3.new(1,1,1); t.ZIndex = 11; Instance.new("UICorner", t)
-    local c = Instance.new("TextButton", o); c.Size = UDim2.new(0.8, 0, 0.2, 0); c.Position = UDim2.new(0.1, 0, 0.6, 0); c.Text = "CONFIRM"; c.BackgroundColor3 = Color3.fromRGB(0, 170, 255); c.ZIndex = 11; Instance.new("UICorner", c)
+    local c = Instance.new("TextButton", o); c.Size = UDim2.new(0.8, 0, 0.2, 0); c.Position = UDim2.new(0.1, 0, 0.6, 0); c.Text = "CONFIRM"; c.BackgroundColor3 = getThemeColor(); c.ZIndex = 11; Instance.new("UICorner", c)
     local b = Instance.new("TextButton", o); b.Size = UDim2.new(0, 30, 0, 30); b.Position = UDim2.new(0, 10, 0, 5); b.Text = "<-"; b.TextColor3 = Color3.new(1,1,1); b.BackgroundTransparency = 1; b.ZIndex = 11
     b.MouseButton1Click:Connect(function() o.Visible = false end)
     return o, t, c
@@ -270,28 +274,57 @@ local function shieldLog(msg, col)
 end
 
 local function performMovement()
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if hum and root then
-        local directions = {
-            root.CFrame.LookVector, -- Forward
-            -root.CFrame.LookVector, -- Backward
-            -root.CFrame.RightVector, -- Left
-            root.CFrame.RightVector -- Right
+        shieldLog("Humanoid Movement...", getThemeColor())
+        local cam = workspace.CurrentCamera
+        local moveDirections = {
+            cam.CFrame.LookVector, -- Forward
+            -cam.CFrame.LookVector, -- Backward
+            -cam.CFrame.RightVector, -- Left
+            cam.CFrame.RightVector -- Right
         }
-        local dirNames = {"Forward", "Backward", "Left", "Right"}
-        local randomIndex = math.random(1, #directions)
-        
-        shieldLog("Walking " .. dirNames[randomIndex] .. "...", Color3.new(1, 1, 0))
-        hum:Move(directions[randomIndex])
+        local dir = moveDirections[math.random(1, #moveDirections)]
+        local targetPos = root.Position + (dir * 5)
+        hum:MoveTo(targetPos)
         task.wait(1.5)
-        hum:Move(Vector3.new(0,0,0))
+        hum:MoveTo(root.Position)
     end
 end
 
 -- 11. CONNECTIONS
+monToggleBtn.MouseButton1Click:Connect(function()
+    monitorActive = not monitorActive
+    monToggleBtn.Text = monitorActive and "MONITOR: ON" or "MONITOR: OFF"
+    monToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(100, 0, 0)
+    mySettings.MonitorEnabled = monitorActive
+    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
+end)
+
+local themes = {
+    {0, 170, 255}, -- Cyan
+    {255, 50, 50}, -- Red
+    {255, 200, 0}, -- Gold
+    {170, 0, 255}, -- Purple
+    {0, 255, 100}  -- Green
+}
+local themeIdx = 1
+themeB.MouseButton1Click:Connect(function()
+    themeIdx = (themeIdx % #themes) + 1
+    local newCol = themes[themeIdx]
+    mySettings.ThemeColor = newCol
+    local c3 = Color3.fromRGB(unpack(newCol))
+    Stroke.Color = c3
+    timerLabel.TextColor3 = c3
+    MinBtn.TextColor3 = c3
+    themeB.TextColor3 = c3
+    timeC.BackgroundColor3 = c3
+    webC.BackgroundColor3 = c3
+    idC.BackgroundColor3 = c3
+    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
+end)
+
 local isMinimized = false
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
@@ -301,24 +334,6 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function() _G.WatchdogRunning = false; ScreenGui:Destroy() end)
-
-hbToggleBtn.MouseButton1Click:Connect(function()
-    monitorActive = not monitorActive
-    mySettings.MonitorEnabled = monitorActive
-    hbToggleBtn.Text = monitorActive and "HB: ON" or "HB: OFF"
-    hbToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 100, 50) or Color3.fromRGB(100, 0, 0)
-    timerLabel.TextColor3 = monitorActive and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 50, 50)
-    monitorStatus.Text = "Heartbeat: "..(monitorActive and "Enabled" or "Disabled").."\nUptime: " .. os.date("!%X", os.time() - startTime)
-    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
-end)
-
-local themes = {Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 50), Color3.fromRGB(180, 50, 255), Color3.fromRGB(255, 200, 0)}
-local themeIdx = 1
-themeB.MouseButton1Click:Connect(function()
-    themeIdx = themeIdx >= #themes and 1 or themeIdx + 1
-    updateUITheme(themes[themeIdx])
-end)
-
 testBtn.MouseButton1Click:Connect(function() sendWebhook("🧪 Test", "Integrated System Working!", 10181046, false) end)
 
 afkBtn.MouseButton1Click:Connect(function()
@@ -339,7 +354,7 @@ end)
 afkInput.FocusLost:Connect(function()
     local n = tonumber(afkInput.Text)
     if n then
-        mySettings.AntiAfkTime = math.clamp(n, 10, 1100)
+        mySettings.AntiAfkTime = math.clamp(n, 15, 1100)
         currentAfkInterval = mySettings.AntiAfkTime
         shieldLog("AFK set to " .. n .. "s", Color3.new(0,1,1))
         if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
@@ -391,27 +406,26 @@ end)
 -- Heartbeat Loop
 task.spawn(function()
     if globalSet.LastBuild ~= "6.2.0" then
-        sendWebhook("📜 Monitor System Updated: 6.2.0", "• Humanoid Movement (WASD relative)\n• Monitor ON/OFF Toggle\n• Persistent UI Themes\n• Bug Fixes for Save System", 16763904, true)
+        sendWebhook("📜 Monitor System Updated: 6.2.0", "• Humanoid AFK Movement\n• Added Monitor ON/OFF Toggle\n• Theme/Color Cycle System\n• Persistence & UI Bugfixes", 16763904, true)
         globalSet.LastBuild = "6.2.0"
         if writefile then writefile(GLOBAL_FILE, HttpService:JSONEncode(globalSet)) end
     end
     
     sendWebhook("🔄 Integrated Watchdog", "System Online v6.2.0", 1752220, false)
     while _G.WatchdogRunning and _G.CurrentSession == SESSION_ID do
-        local timeLeft = HEARTBEAT_INTERVAL
-        forceRestartLoop = false
-        while timeLeft > 0 and _G.WatchdogRunning and not forceRestartLoop do
-            if monitorActive then
+        if monitorActive then
+            local timeLeft = HEARTBEAT_INTERVAL
+            forceRestartLoop = false
+            while timeLeft > 0 and _G.WatchdogRunning and not forceRestartLoop and monitorActive do
                 timerLabel.Text = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
-                timeLeft = timeLeft - 1
-            else
-                timerLabel.Text = "PAUSED"
+                monitorStatus.Text = "Heartbeat: Active\nUptime: " .. os.date("!%X", os.time() - startTime)
+                task.wait(1); timeLeft = timeLeft - 1
             end
-            monitorStatus.Text = "Heartbeat: "..(monitorActive and "Enabled" or "Disabled").."\nUptime: " .. os.date("!%X", os.time() - startTime)
+            if _G.WatchdogRunning and not forceRestartLoop and monitorActive then sendWebhook("🔄 Heartbeat", "Stable.", 1752220, false) end
+        else
+            timerLabel.Text = "PAUSED"
+            monitorStatus.Text = "Heartbeat: DISABLED\nWebhook notifications paused."
             task.wait(1)
-        end
-        if _G.WatchdogRunning and not forceRestartLoop and monitorActive then 
-            sendWebhook("🔄 Heartbeat", "Stable.", 1752220, false) 
         end
     end
 end)
@@ -425,7 +439,7 @@ task.spawn(function()
             if afkRemaining <= 0 then
                 performMovement()
                 lastAfkAction = tick()
-                currentAfkInterval = mySettings.AntiAfkTime + math.random(-10, 10)
+                currentAfkInterval = mySettings.AntiAfkTime + math.random(-5, 5)
             end
         else
             shieldStatus.Text = "Shield: STANDBY\nAuto-Rejoin: " .. (autoRejoinActive and "ON" or "OFF")
