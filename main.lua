@@ -1,4 +1,4 @@
--- [[ WATCHDOG INTEGRATED - VERSION 6.2.0 ]] --
+-- [[ WATCHDOG INTEGRATED - VERSION 6.3.0 ]] --
 -- [[ Fused Heartbeat V2 + Watchdog Shield ]] --
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -90,7 +90,7 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     }
 
     if isUpdateLog then
-        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.2.0*"
+        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.3.0*"
     else
         embed.description = "Status for **" .. player.Name .. "**"
         embed.fields = {
@@ -136,7 +136,6 @@ MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 
--- UI Theme Logic
 local function getThemeColor()
     if mySettings.ThemeColor and type(mySettings.ThemeColor) == "table" and #mySettings.ThemeColor == 3 then
         return Color3.fromRGB(unpack(mySettings.ThemeColor))
@@ -153,7 +152,7 @@ TopBar.Size = UDim2.new(1, 0, 0, 35)
 TopBar.BackgroundTransparency = 1
 
 local Title = Instance.new("TextLabel", TopBar)
-Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG INTEGRATED v6.2.0"; Title.TextColor3 = Color3.new(1,1,1)
+Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG INTEGRATED v6.3.0"; Title.TextColor3 = Color3.new(1,1,1)
 Title.Font = Enum.Font.GothamBold; Title.TextSize = 11; Title.BackgroundTransparency = 1
 
 local CloseBtn = Instance.new("TextButton", TopBar); CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 2)
@@ -236,10 +235,10 @@ local themeB = createSetBtn("THEME", UDim2.new(0.52, 0, 0.25, 0), getThemeColor(
 local dscB = createSetBtn("COPY DISCORD", UDim2.new(0.02, 0, 0.5, 0), Color3.new(0.5, 0.5, 1))
 local resetB = createSetBtn("FULL RESET", UDim2.new(0.52, 0, 0.5, 0), Color3.new(1, 0.2, 0))
 
--- 8. OVERLAYS
+-- 8. OVERLAYS (Fixed UI & Text Scaling)
 local function createOverlay(placeholder)
     local o = Instance.new("Frame", MainFrame); o.Size = UDim2.new(1,0,1,0); o.BackgroundColor3 = Color3.fromRGB(15, 15, 20); o.Visible = false; o.ZIndex = 10; Instance.new("UICorner", o)
-    local t = Instance.new("TextBox", o); t.Size = UDim2.new(0.8, 0, 0.2, 0); t.Position = UDim2.new(0.1, 0, 0.3, 0); t.PlaceholderText = placeholder; t.BackgroundColor3 = Color3.fromRGB(30,30,40); t.TextColor3 = Color3.new(1,1,1); t.ZIndex = 11; Instance.new("UICorner", t)
+    local t = Instance.new("TextBox", o); t.Size = UDim2.new(0.8, 0, 0.25, 0); t.Position = UDim2.new(0.1, 0, 0.25, 0); t.PlaceholderText = placeholder; t.BackgroundColor3 = Color3.fromRGB(30,30,40); t.TextColor3 = Color3.new(1,1,1); t.ZIndex = 11; t.TextScaled = true; t.ClearTextOnFocus = false; Instance.new("UICorner", t)
     local c = Instance.new("TextButton", o); c.Size = UDim2.new(0.8, 0, 0.2, 0); c.Position = UDim2.new(0.1, 0, 0.6, 0); c.Text = "CONFIRM"; c.BackgroundColor3 = getThemeColor(); c.ZIndex = 11; Instance.new("UICorner", c)
     local b = Instance.new("TextButton", o); b.Size = UDim2.new(0, 30, 0, 30); b.Position = UDim2.new(0, 10, 0, 5); b.Text = "<-"; b.TextColor3 = Color3.new(1,1,1); b.BackgroundTransparency = 1; b.ZIndex = 11
     b.MouseButton1Click:Connect(function() o.Visible = false end)
@@ -315,13 +314,8 @@ themeB.MouseButton1Click:Connect(function()
     local newCol = themes[themeIdx]
     mySettings.ThemeColor = newCol
     local c3 = Color3.fromRGB(unpack(newCol))
-    Stroke.Color = c3
-    timerLabel.TextColor3 = c3
-    MinBtn.TextColor3 = c3
-    themeB.TextColor3 = c3
-    timeC.BackgroundColor3 = c3
-    webC.BackgroundColor3 = c3
-    idC.BackgroundColor3 = c3
+    Stroke.Color = c3; timerLabel.TextColor3 = c3; MinBtn.TextColor3 = c3; themeB.TextColor3 = c3;
+    timeC.BackgroundColor3 = c3; webC.BackgroundColor3 = c3; idC.BackgroundColor3 = c3
     if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
 end)
 
@@ -331,6 +325,9 @@ MinBtn.MouseButton1Click:Connect(function()
     Content.Visible = not isMinimized
     MainFrame:TweenSize(isMinimized and UDim2.new(0, 300, 0, 35) or UDim2.new(0, 300, 0, 320), "Out", "Quart", 0.3, true)
     MinBtn.Text = isMinimized and "+" or "-"
+    if not isMinimized then
+        Title.Text = "WATCHDOG INTEGRATED v6.3.0"
+    end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function() _G.WatchdogRunning = false; ScreenGui:Destroy() end)
@@ -405,25 +402,28 @@ end)
 
 -- Heartbeat Loop
 task.spawn(function()
-    if globalSet.LastBuild ~= "6.2.0" then
-        sendWebhook("📜 Monitor System Updated: 6.2.0", "• Humanoid AFK Movement\n• Added Monitor ON/OFF Toggle\n• Theme/Color Cycle System\n• Persistence & UI Bugfixes", 16763904, true)
-        globalSet.LastBuild = "6.2.0"
+    if globalSet.LastBuild ~= "6.3.0" then
+        sendWebhook("📜 Monitor System Updated: 6.3.0", "• Live Timer when Minimized\n• Fixed Input Scaling & Cornering\n• Theme persistence on inputs\n• JSON Stability for Admins", 16763904, true)
+        globalSet.LastBuild = "6.3.0"
         if writefile then writefile(GLOBAL_FILE, HttpService:JSONEncode(globalSet)) end
     end
     
-    sendWebhook("🔄 Integrated Watchdog", "System Online v6.2.0", 1752220, false)
+    sendWebhook("🔄 Integrated Watchdog", "System Online v6.3.0", 1752220, false)
     while _G.WatchdogRunning and _G.CurrentSession == SESSION_ID do
         if monitorActive then
             local timeLeft = HEARTBEAT_INTERVAL
             forceRestartLoop = false
             while timeLeft > 0 and _G.WatchdogRunning and not forceRestartLoop and monitorActive do
-                timerLabel.Text = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
+                local timeStr = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
+                timerLabel.Text = timeStr
+                if isMinimized then Title.Text = "HEARTBEAT: " .. timeStr end
                 monitorStatus.Text = "Heartbeat: Active\nUptime: " .. os.date("!%X", os.time() - startTime)
                 task.wait(1); timeLeft = timeLeft - 1
             end
             if _G.WatchdogRunning and not forceRestartLoop and monitorActive then sendWebhook("🔄 Heartbeat", "Stable.", 1752220, false) end
         else
             timerLabel.Text = "PAUSED"
+            if isMinimized then Title.Text = "HEARTBEAT: PAUSED" end
             monitorStatus.Text = "Heartbeat: DISABLED\nWebhook notifications paused."
             task.wait(1)
         end
@@ -454,4 +454,4 @@ MainFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.User
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then local delta = input.Position - dragStart MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
-shieldLog("Watchdog Integrated v6.2.0 Loaded", Color3.new(1,1,1))
+shieldLog("Watchdog Integrated v6.3.0 Loaded", Color3.new(1,1,1))
