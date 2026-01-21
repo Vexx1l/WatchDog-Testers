@@ -1,4 +1,4 @@
--- [[ WATCHDOG INTEGRATED - VERSION 6.3.1 ]] --
+-- [[ WATCHDOG INTEGRATED - VERSION 6.3.2 ]] --
 -- [[ Fused Heartbeat V2 + Watchdog Shield ]] --
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -90,7 +90,7 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     }
 
     if isUpdateLog then
-        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.3.1*"
+        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.3.2*"
     else
         embed.description = "Status for **" .. player.Name .. "**"
         embed.fields = {
@@ -153,7 +153,7 @@ TopBar.Size = UDim2.new(1, 0, 0, 35)
 TopBar.BackgroundTransparency = 1
 
 local Title = Instance.new("TextLabel", TopBar)
-Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG INTEGRATED v6.3.1"; Title.TextColor3 = Color3.new(1,1,1)
+Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG INTEGRATED v6.3.2"; Title.TextColor3 = Color3.new(1,1,1)
 Title.Font = Enum.Font.GothamBold; Title.TextSize = 11; Title.BackgroundTransparency = 1
 
 local CloseBtn = Instance.new("TextButton", TopBar); CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 2)
@@ -169,7 +169,7 @@ Content.Size = UDim2.new(1, 0, 1, -35); Content.Position = UDim2.new(0, 0, 0, 35
 local TabContainer = Instance.new("Frame", Content)
 TabContainer.Size = UDim2.new(1, -20, 1, -50); TabContainer.Position = UDim2.new(0, 10, 0, 5); TabContainer.BackgroundTransparency = 1
 
--- FIXED NAV: Using a CanvasGroup to ensure the bottom corners follow MainFrame
+-- FIXED NAV: Using a CanvasGroup
 local Nav = Instance.new("CanvasGroup", Content)
 Nav.Size = UDim2.new(1, 0, 0, 35)
 Nav.Position = UDim2.new(0, 0, 1, -35)
@@ -256,13 +256,20 @@ local themeB = createSetBtn("THEME", UDim2.new(0.52, 0, 0.25, 0), getThemeColor(
 local dscB = createSetBtn("COPY DISCORD", UDim2.new(0.02, 0, 0.5, 0), Color3.new(0.5, 0.5, 1))
 local resetB = createSetBtn("FULL RESET", UDim2.new(0.52, 0, 0.5, 0), Color3.new(1, 0.2, 0))
 
--- 8. OVERLAYS
+-- Helper to disable background when overlay is active
+local function setOverlayState(visible)
+    TabContainer.Visible = not visible
+    Nav.Visible = not visible
+end
+
+-- 8. OVERLAYS (MODAL FIX)
 local function createOverlay(placeholder)
     local o = Instance.new("Frame", MainFrame); o.Size = UDim2.new(1,0,1,0); o.BackgroundColor3 = Color3.fromRGB(15, 15, 20); o.Visible = false; o.ZIndex = 10; Instance.new("UICorner", o)
+    o.Active = true -- Block clicks through frame
     local t = Instance.new("TextBox", o); t.Size = UDim2.new(0.8, 0, 0.25, 0); t.Position = UDim2.new(0.1, 0, 0.25, 0); t.PlaceholderText = placeholder; t.BackgroundColor3 = Color3.fromRGB(30,30,40); t.TextColor3 = Color3.new(1,1,1); t.ZIndex = 11; t.TextScaled = true; t.ClearTextOnFocus = false; Instance.new("UICorner", t)
     local c = Instance.new("TextButton", o); c.Size = UDim2.new(0.8, 0, 0.2, 0); c.Position = UDim2.new(0.1, 0, 0.6, 0); c.Text = "CONFIRM"; c.BackgroundColor3 = getThemeColor(); c.ZIndex = 11; Instance.new("UICorner", c)
     local b = Instance.new("TextButton", o); b.Size = UDim2.new(0, 30, 0, 30); b.Position = UDim2.new(0, 10, 0, 5); b.Text = "<-"; b.TextColor3 = Color3.new(1,1,1); b.BackgroundTransparency = 1; b.ZIndex = 11
-    b.MouseButton1Click:Connect(function() o.Visible = false end)
+    b.MouseButton1Click:Connect(function() o.Visible = false; setOverlayState(false) end)
     return o, t, c
 end
 
@@ -288,26 +295,6 @@ local function shieldLog(msg, col)
     feed.CanvasPosition = Vector2.new(0, feed.CanvasSize.Y.Offset)
 end
 
-local function performMovement()
-    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if hum and root then
-        shieldLog("Humanoid Movement...", getThemeColor())
-        local cam = workspace.CurrentCamera
-        local moveDirections = {
-            cam.CFrame.LookVector, -- Forward
-            -cam.CFrame.LookVector, -- Backward
-            -cam.CFrame.RightVector, -- Left
-            cam.CFrame.RightVector -- Right
-        }
-        local dir = moveDirections[math.random(1, #moveDirections)]
-        local targetPos = root.Position + (dir * 5)
-        hum:MoveTo(targetPos)
-        task.wait(1.5)
-        hum:MoveTo(root.Position)
-    end
-end
-
 -- 11. CONNECTIONS
 monToggleBtn.MouseButton1Click:Connect(function()
     monitorActive = not monitorActive
@@ -318,11 +305,7 @@ monToggleBtn.MouseButton1Click:Connect(function()
 end)
 
 local themes = {
-    {0, 170, 255}, -- Cyan
-    {255, 50, 50}, -- Red
-    {255, 200, 0}, -- Gold
-    {170, 0, 255}, -- Purple
-    {0, 255, 100}  -- Green
+    {0, 170, 255}, {255, 50, 50}, {255, 200, 0}, {170, 0, 255}, {0, 255, 100}
 }
 local themeIdx = 1
 themeB.MouseButton1Click:Connect(function()
@@ -341,9 +324,7 @@ MinBtn.MouseButton1Click:Connect(function()
     Content.Visible = not isMinimized
     MainFrame:TweenSize(isMinimized and UDim2.new(0, 300, 0, 35) or UDim2.new(0, 300, 0, 320), "Out", "Quart", 0.3, true)
     MinBtn.Text = isMinimized and "+" or "-"
-    if not isMinimized then
-        Title.Text = "WATCHDOG INTEGRATED v6.3.1"
-    end
+    if not isMinimized then Title.Text = "WATCHDOG INTEGRATED v6.3.2" end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function() _G.WatchdogRunning = false; ScreenGui:Destroy() end)
@@ -377,18 +358,19 @@ end)
 botB.MouseButton1Click:Connect(function() setclipboard("https://discord.com/oauth2/authorize?client_id=1460862231926407252&permissions=8&integration_type=0&scope=bot") shieldLog("Bot link copied!", Color3.new(0,1,0)) end)
 dscB.MouseButton1Click:Connect(function() setclipboard("https://discord.gg/Gzqm7NKJUM") shieldLog("Discord link copied!", Color3.new(0,1,0)) end)
 
-timeB.MouseButton1Click:Connect(function() timeO.Visible = true end)
+-- Settings Modal Trigger Fixes
+timeB.MouseButton1Click:Connect(function() timeO.Visible = true; setOverlayState(true) end)
 timeC.MouseButton1Click:Connect(function() 
     local n = tonumber(timeI.Text); if n then HEARTBEAT_INTERVAL = n * 60; mySettings.Timer = n * 60; forceRestartLoop = true end
-    timeO.Visible = false; if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
+    timeO.Visible = false; setOverlayState(false); if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
 end)
 
-cfgB.MouseButton1Click:Connect(function() webO.Visible = true end)
+cfgB.MouseButton1Click:Connect(function() webO.Visible = true; setOverlayState(true) end)
 webC.MouseButton1Click:Connect(function() 
     WEBHOOK_URL = webI.Text:gsub("%s+", ""); mySettings.Webhook = WEBHOOK_URL; webO.Visible = false; idO.Visible = true 
 end)
 idC.MouseButton1Click:Connect(function() 
-    DISCORD_USER_ID = idI.Text; mySettings.UserID = idI.Text; idO.Visible = false
+    DISCORD_USER_ID = idI.Text; mySettings.UserID = idI.Text; idO.Visible = false; setOverlayState(false)
     if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
     sendWebhook("✅ Watchdog Config", "System Linked Successfully.", 3066993, false)
 end)
@@ -418,13 +400,13 @@ end)
 
 -- Heartbeat Loop
 task.spawn(function()
-    if globalSet.LastBuild ~= "6.3.1" then
-        sendWebhook("📜 Monitor System Updated: 6.3.1", "• Improved Cornering for Mobile/PC\n• Fixed Bottom UI straightness\n• Maintained Admin JSON stability", 16763904, true)
-        globalSet.LastBuild = "6.3.1"
+    if globalSet.LastBuild ~= "6.3.2" then
+        sendWebhook("📜 Monitor System Updated: 6.3.2", "• Fixed Click-Through on settings overlays\n• Improved Modal UI logic\n• Stable JSON admin configuration", 16763904, true)
+        globalSet.LastBuild = "6.3.2"
         if writefile then writefile(GLOBAL_FILE, HttpService:JSONEncode(globalSet)) end
     end
     
-    sendWebhook("🔄 Integrated Watchdog", "System Online v6.3.1", 1752220, false)
+    sendWebhook("🔄 Integrated Watchdog", "System Online v6.3.2", 1752220, false)
     while _G.WatchdogRunning and _G.CurrentSession == SESSION_ID do
         if monitorActive then
             local timeLeft = HEARTBEAT_INTERVAL
@@ -453,7 +435,20 @@ task.spawn(function()
             local afkRemaining = math.ceil(currentAfkInterval - (tick() - lastAfkAction))
             shieldStatus.Text = string.format("Shield: ACTIVE | Move: %ds\nRejoin: %s", afkRemaining, autoRejoinActive and "ON" or "OFF")
             if afkRemaining <= 0 then
-                performMovement()
+                -- Humanoid Movement
+                pcall(function()
+                    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                    if hum and root then
+                        shieldLog("Humanoid Movement...", getThemeColor())
+                        local cam = workspace.CurrentCamera
+                        local dir = {cam.CFrame.LookVector, -cam.CFrame.LookVector, -cam.CFrame.RightVector, cam.CFrame.RightVector}
+                        local target = root.Position + (dir[math.random(1, #dir)] * 5)
+                        hum:MoveTo(target)
+                        task.wait(1.5)
+                        hum:MoveTo(root.Position)
+                    end
+                end)
                 lastAfkAction = tick()
                 currentAfkInterval = mySettings.AntiAfkTime + math.random(-5, 5)
             end
@@ -470,4 +465,4 @@ MainFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.User
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then local delta = input.Position - dragStart MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
-shieldLog("Watchdog Integrated v6.3.1 Loaded", Color3.new(1,1,1))
+shieldLog("Watchdog Integrated v6.3.2 Loaded", Color3.new(1,1,1))
