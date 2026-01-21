@@ -1,4 +1,4 @@
--- [[ WATCHDOG INTEGRATED - VERSION 6.3.0 ]] --
+-- [[ WATCHDOG INTEGRATED - VERSION 6.3.1 ]] --
 -- [[ Fused Heartbeat V2 + Watchdog Shield ]] --
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -90,7 +90,7 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     }
 
     if isUpdateLog then
-        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.3.0*"
+        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.3.1*"
     else
         embed.description = "Status for **" .. player.Name .. "**"
         embed.fields = {
@@ -134,7 +134,8 @@ MainFrame.Position = UDim2.new(0.5, -150, 0.4, -160)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+local MainCorner = Instance.new("UICorner", MainFrame)
+MainCorner.CornerRadius = UDim.new(0, 12)
 
 local function getThemeColor()
     if mySettings.ThemeColor and type(mySettings.ThemeColor) == "table" and #mySettings.ThemeColor == 3 then
@@ -152,7 +153,7 @@ TopBar.Size = UDim2.new(1, 0, 0, 35)
 TopBar.BackgroundTransparency = 1
 
 local Title = Instance.new("TextLabel", TopBar)
-Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG INTEGRATED v6.3.0"; Title.TextColor3 = Color3.new(1,1,1)
+Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG INTEGRATED v6.3.1"; Title.TextColor3 = Color3.new(1,1,1)
 Title.Font = Enum.Font.GothamBold; Title.TextSize = 11; Title.BackgroundTransparency = 1
 
 local CloseBtn = Instance.new("TextButton", TopBar); CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 2)
@@ -168,8 +169,28 @@ Content.Size = UDim2.new(1, 0, 1, -35); Content.Position = UDim2.new(0, 0, 0, 35
 local TabContainer = Instance.new("Frame", Content)
 TabContainer.Size = UDim2.new(1, -20, 1, -50); TabContainer.Position = UDim2.new(0, 10, 0, 5); TabContainer.BackgroundTransparency = 1
 
-local Nav = Instance.new("Frame", Content)
-Nav.Size = UDim2.new(1, 0, 0, 35); Nav.Position = UDim2.new(0, 0, 1, -35); Nav.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+-- FIXED NAV: Using a CanvasGroup to ensure the bottom corners follow MainFrame
+local Nav = Instance.new("CanvasGroup", Content)
+Nav.Size = UDim2.new(1, 0, 0, 35)
+Nav.Position = UDim2.new(0, 0, 1, -35)
+Nav.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Nav.BorderSizePixel = 0
+local NavCorner = Instance.new("UICorner", Nav)
+NavCorner.CornerRadius = UDim.new(0, 12)
+
+-- Navigation Buttons
+local function navBtn(name, x)
+    local b = Instance.new("TextButton", Nav)
+    b.Size = UDim2.new(0.334, 0, 1, 0)
+    b.Position = UDim2.new(x, 0, 0, 0)
+    b.Text = name
+    b.BackgroundTransparency = 1
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 10
+    b.BorderSizePixel = 0
+    return b
+end
 
 local function createTab()
     local f = Instance.new("Frame", TabContainer); f.Size = UDim2.new(1, 0, 1, 0); f.Visible = false; f.BackgroundTransparency = 1
@@ -235,7 +256,7 @@ local themeB = createSetBtn("THEME", UDim2.new(0.52, 0, 0.25, 0), getThemeColor(
 local dscB = createSetBtn("COPY DISCORD", UDim2.new(0.02, 0, 0.5, 0), Color3.new(0.5, 0.5, 1))
 local resetB = createSetBtn("FULL RESET", UDim2.new(0.52, 0, 0.5, 0), Color3.new(1, 0.2, 0))
 
--- 8. OVERLAYS (Fixed UI & Text Scaling)
+-- 8. OVERLAYS
 local function createOverlay(placeholder)
     local o = Instance.new("Frame", MainFrame); o.Size = UDim2.new(1,0,1,0); o.BackgroundColor3 = Color3.fromRGB(15, 15, 20); o.Visible = false; o.ZIndex = 10; Instance.new("UICorner", o)
     local t = Instance.new("TextBox", o); t.Size = UDim2.new(0.8, 0, 0.25, 0); t.Position = UDim2.new(0.1, 0, 0.25, 0); t.PlaceholderText = placeholder; t.BackgroundColor3 = Color3.fromRGB(30,30,40); t.TextColor3 = Color3.new(1,1,1); t.ZIndex = 11; t.TextScaled = true; t.ClearTextOnFocus = false; Instance.new("UICorner", t)
@@ -256,14 +277,9 @@ local function showTab(tab)
 end
 showTab(MonitorTab)
 
-local function navBtn(name, x)
-    local b = Instance.new("TextButton", Nav); b.Size = UDim2.new(0.33, 0, 1, 0); b.Position = UDim2.new(x, 0, 0, 0); b.Text = name; b.BackgroundColor3 = Color3.fromRGB(30, 30, 35); b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.GothamBold; b.TextSize = 10; b.BorderSizePixel = 0
-    return b
-end
-
 navBtn("MONITOR", 0).MouseButton1Click:Connect(function() showTab(MonitorTab) end)
-navBtn("SHIELD", 0.33).MouseButton1Click:Connect(function() showTab(ShieldTab) end)
-navBtn("SETTINGS", 0.66).MouseButton1Click:Connect(function() showTab(SettingsTab) end)
+navBtn("SHIELD", 0.333).MouseButton1Click:Connect(function() showTab(ShieldTab) end)
+navBtn("SETTINGS", 0.666).MouseButton1Click:Connect(function() showTab(SettingsTab) end)
 
 -- 10. LOGIC: SHIELD ACTIONS
 local function shieldLog(msg, col)
@@ -326,7 +342,7 @@ MinBtn.MouseButton1Click:Connect(function()
     MainFrame:TweenSize(isMinimized and UDim2.new(0, 300, 0, 35) or UDim2.new(0, 300, 0, 320), "Out", "Quart", 0.3, true)
     MinBtn.Text = isMinimized and "+" or "-"
     if not isMinimized then
-        Title.Text = "WATCHDOG INTEGRATED v6.3.0"
+        Title.Text = "WATCHDOG INTEGRATED v6.3.1"
     end
 end)
 
@@ -402,13 +418,13 @@ end)
 
 -- Heartbeat Loop
 task.spawn(function()
-    if globalSet.LastBuild ~= "6.3.0" then
-        sendWebhook("📜 Monitor System Updated: 6.3.0", "• Live Timer when Minimized\n• Fixed Input Scaling & Cornering\n• Theme persistence on inputs\n• JSON Stability for Admins", 16763904, true)
-        globalSet.LastBuild = "6.3.0"
+    if globalSet.LastBuild ~= "6.3.1" then
+        sendWebhook("📜 Monitor System Updated: 6.3.1", "• Improved Cornering for Mobile/PC\n• Fixed Bottom UI straightness\n• Maintained Admin JSON stability", 16763904, true)
+        globalSet.LastBuild = "6.3.1"
         if writefile then writefile(GLOBAL_FILE, HttpService:JSONEncode(globalSet)) end
     end
     
-    sendWebhook("🔄 Integrated Watchdog", "System Online v6.3.0", 1752220, false)
+    sendWebhook("🔄 Integrated Watchdog", "System Online v6.3.1", 1752220, false)
     while _G.WatchdogRunning and _G.CurrentSession == SESSION_ID do
         if monitorActive then
             local timeLeft = HEARTBEAT_INTERVAL
@@ -454,4 +470,4 @@ MainFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.User
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then local delta = input.Position - dragStart MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
-shieldLog("Watchdog Integrated v6.3.0 Loaded", Color3.new(1,1,1))
+shieldLog("Watchdog Integrated v6.3.1 Loaded", Color3.new(1,1,1))
