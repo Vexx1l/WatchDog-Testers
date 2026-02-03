@@ -96,12 +96,15 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     local fps = math.floor(workspace:GetRealPhysicsFPS())
     local ping = math.floor(player:GetNetworkPing() * 1000)
     
+    -- Correctly formatted Thumbnail URL for Discord
+    local thumbUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=420&height=420&format=png"
+
     local embed = {
-        title = title,
-        color = color or 1752220,
-        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-        thumbnail = {
-            url = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=420&height=420&format=png"
+        ["title"] = title,
+        ["color"] = color or 1752220,
+        ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        ["thumbnail"] = {
+            ["url"] = thumbUrl
         }
     }
 
@@ -126,6 +129,7 @@ local function sendWebhook(title, reason, color, isUpdateLog)
         embeds = {embed}
     })
 
+    -- HTTP Request execution remains the same...
     local requestFunc = (request or http_request or syn.request or (http and http.request))
     if requestFunc then
         task.spawn(function()
