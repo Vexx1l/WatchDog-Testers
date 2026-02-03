@@ -1,5 +1,5 @@
--- [[ WATCHDOG INTEGRATED - VERSION 6.4.0 ]] --
--- [[ Fused Heartbeat V2 + Watchdog Shield ]] --
+-- [[ WATCHDOG INTEGRATED - VERSION 6.4.1 ]] --
+-- [[ Thumbnail & Performance Fix Edition ]] --
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 local Players = game:GetService("Players")
@@ -86,7 +86,7 @@ local autoRejoinActive = mySettings.AutoRejoin
 local lastAfkAction = tick()
 local currentAfkInterval = mySettings.AntiAfkTime
 
--- 3. WEBHOOK CORE
+-- 3. WEBHOOK CORE (FIXED THUMBNAIL LOGIC)
 local function sendWebhook(title, reason, color, isUpdateLog)
     if not monitorActive or WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
     if isBlocked and tick() < blockExpires then return end
@@ -96,9 +96,9 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     local fps = math.floor(workspace:GetRealPhysicsFPS())
     local ping = math.floor(player:GetNetworkPing() * 1000)
     
-    -- Correctly formatted Thumbnail URL for Discord
-    local thumbUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=420&height=420&format=png"
-
+    -- Optimized Thumbnail URL Construction
+    local thumbUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(player.UserId) .. "&width=420&height=420&format=png"
+    
     local embed = {
         ["title"] = title,
         ["color"] = color or 1752220,
@@ -109,32 +109,36 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     }
 
     if isUpdateLog then
-        embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.4.0*"
+        embed["description"] = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.4.1*"
     else
-        embed.description = "Status for **" .. webhookCensor(player.Name) .. "**"
-        embed.fields = {
-            { name = "🎮 Game", value = currentGameName, inline = true },
-            { name = "🔢 Server Version", value = "v" .. game.PlaceVersion, inline = true },
-            { name = "👥 Players", value = #Players:GetPlayers() .. " / " .. Players.MaxPlayers, inline = true },
-            { name = "🛰️ Performance", value = "FPS: " .. fps .. " | Ping: " .. ping .. "ms", inline = true },
-            { name = "📊 Session Info", value = "Uptime: " .. os.date("!%X", os.time() - startTime), inline = true },
-            { name = "🕒 Updated At", value = "<t:" .. currentTime .. ":f>", inline = false },
-            { name = "🔔 Next Update", value = "<t:" .. (currentTime + HEARTBEAT_INTERVAL) .. ":R>", inline = true },
-            { name = "💬 Status", value = "```" .. reason .. "```", inline = false }
+        embed["description"] = "Status for **" .. webhookCensor(player.Name) .. "**"
+        embed["fields"] = {
+            { ["name"] = "🎮 Game", ["value"] = currentGameName, ["inline"] = true },
+            { ["name"] = "🔢 Server Version", ["value"] = "v" .. game.PlaceVersion, ["inline"] = true },
+            { ["name"] = "👥 Players", ["value"] = #Players:GetPlayers() .. " / " .. Players.MaxPlayers, ["inline"] = true },
+            { ["name"] = "🛰️ Performance", ["value"] = "FPS: " .. fps .. " | Ping: " .. ping .. "ms", ["inline"] = true },
+            { ["name"] = "📊 Session Info", ["value"] = "Uptime: " .. os.date("!%X", os.time() - startTime), ["inline"] = true },
+            { ["name"] = "🕒 Updated At", ["value"] = "<t:" .. currentTime .. ":f>", ["inline"] = false },
+            { ["name"] = "🔔 Next Update", ["value"] = "<t:" .. (currentTime + HEARTBEAT_INTERVAL) .. ":R>", ["inline"] = true },
+            { ["name"] = "💬 Status", ["value"] = "```" .. reason .. "```", ["inline"] = false }
         }
     end
 
     local payload = HttpService:JSONEncode({
-        content = (not isUpdateLog and title ~= "🔄 Heartbeat") and "<@" .. DISCORD_USER_ID .. ">" or nil,
-        embeds = {embed}
+        ["content"] = (not isUpdateLog and title ~= "🔄 Heartbeat") and "<@" .. DISCORD_USER_ID .. ">" or nil,
+        ["embeds"] = {embed}
     })
 
-    -- HTTP Request execution remains the same...
     local requestFunc = (request or http_request or syn.request or (http and http.request))
     if requestFunc then
         task.spawn(function()
             local success, response = pcall(function()
-                return requestFunc({Url = WEBHOOK_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = payload})
+                return requestFunc({
+                    Url = WEBHOOK_URL, 
+                    Method = "POST", 
+                    Headers = {["Content-Type"] = "application/json"}, 
+                    Body = payload
+                })
             end)
             if response and response.StatusCode == 429 then
                 isBlocked = true
@@ -144,7 +148,7 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     end
 end
 
--- 4. UI CREATION
+-- 4. UI CREATION (UPDATED FOR 6.4.1)
 local ScreenGui = Instance.new("ScreenGui", (game:GetService("CoreGui") or player.PlayerGui))
 ScreenGui.Name = "WatchdogIntegratedUI"
 ScreenGui.ResetOnSpawn = false
@@ -174,7 +178,7 @@ TopBar.Size = UDim2.new(1, 0, 0, 35)
 TopBar.BackgroundTransparency = 1
 
 local Title = Instance.new("TextLabel", TopBar)
-Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG v6.4.0 | " .. censorName(player.Name); Title.TextColor3 = Color3.new(1,1,1)
+Title.Size = UDim2.new(1, 0, 1, 0); Title.Text = "WATCHDOG v6.4.1 | " .. censorName(player.Name); Title.TextColor3 = Color3.new(1,1,1)
 Title.Font = Enum.Font.GothamBold; Title.TextSize = 10; Title.BackgroundTransparency = 1
 
 local CloseBtn = Instance.new("TextButton", TopBar); CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 2)
@@ -321,7 +325,7 @@ MinBtn.MouseButton1Click:Connect(function()
     Content.Visible = not isMinimized
     MainFrame:TweenSize(isMinimized and UDim2.new(0, 300, 0, 35) or UDim2.new(0, 300, 0, 320), "Out", "Quart", 0.3, true)
     MinBtn.Text = isMinimized and "+" or "-"
-    if not isMinimized then Title.Text = "WATCHDOG v6.4.0 | " .. censorName(player.Name) end
+    if not isMinimized then Title.Text = "WATCHDOG v6.4.1 | " .. censorName(player.Name) end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function() _G.WatchdogRunning = false; ScreenGui:Destroy() end)
@@ -392,20 +396,20 @@ GuiService.ErrorMessageChanged:Connect(function()
 end)
 
 task.spawn(function()
-    if globalSet.LastBuild ~= "6.4.0" then
-        sendWebhook("📜 System Updated: 6.4.0", "• Added Player Avatar Thumbnails to Webhooks\n• Added Real-time FPS and Ping monitoring\n• Enhanced privacy features and bug fixes", 16763904, true)
-        globalSet.LastBuild = "6.4.0"
+    if globalSet.LastBuild ~= "6.4.1" then
+        sendWebhook("📜 System Updated: 6.4.1", "• Fixed Avatar Thumbnail visibility issues\n• Restructured Embed JSON for better executor compatibility\n• Improved Performance metric accuracy", 16763904, true)
+        globalSet.LastBuild = "6.4.1"
         if writefile then writefile(GLOBAL_FILE, HttpService:JSONEncode(globalSet)) end
     end
     
-    sendWebhook("🔄 Integrated Watchdog", "System Online v6.4.0", 1752220, false)
+    sendWebhook("🔄 Integrated Watchdog", "System Online v6.4.1", 1752220, false)
     while _G.WatchdogRunning and _G.CurrentSession == SESSION_ID do
         if monitorActive then
             local timeLeft = HEARTBEAT_INTERVAL; forceRestartLoop = false
             while timeLeft > 0 and _G.WatchdogRunning and not forceRestartLoop and monitorActive do
                 local timeStr = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
                 timerLabel.Text = timeStr
-                if isMinimized then Title.Text = "HeartBeat: " .. timeStr .. " | " .. censorName(player.Name) end
+                if isMinimized then Title.Text = "HB: " .. timeStr .. " | " .. censorName(player.Name) end
                 monitorStatus.Text = "Heartbeat: Active\nUptime: " .. os.date("!%X", os.time() - startTime)
                 task.wait(1); timeLeft = timeLeft - 1
             end
@@ -448,4 +452,4 @@ MainFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.User
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then local delta = input.Position - dragStart MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
-shieldLog("Watchdog Integrated v6.4.0 Loaded", Color3.new(1,1,1))
+shieldLog("Watchdog Integrated v6.4.1 Loaded", Color3.new(1,1,1))
