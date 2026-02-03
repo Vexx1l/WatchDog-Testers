@@ -10,8 +10,9 @@ local UserInputService = game:GetService("UserInputService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
+local Stats = game:GetService("Stats")
 
--- CENSORSHIP & IMAGE UTILS
+-- CENSORSHIP UTILS
 local function censorName(name)
     return name:sub(1, 2) .. string.rep("*", #name - 2)
 end
@@ -68,8 +69,7 @@ local mySettings = loadData(LOCAL_FILE, {
     AntiAfkTime = 300,
     AutoRejoin = false,
     MonitorEnabled = true,
-    ThemeColor = {0, 170, 255},
-    ThumbnailEnabled = true
+    ThemeColor = {0, 170, 255}
 })
 
 local HEARTBEAT_INTERVAL = mySettings.Timer
@@ -80,7 +80,6 @@ local isBlocked = false
 local blockExpires = 0
 local forceRestartLoop = false
 local monitorActive = mySettings.MonitorEnabled
-local thumbnailActive = mySettings.ThumbnailEnabled
 
 local antiAfkActive = false
 local autoRejoinActive = mySettings.AutoRejoin
@@ -94,18 +93,17 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     isBlocked = false
 
     local currentTime = os.time()
+    local fps = math.floor(workspace:GetRealPhysicsFPS())
+    local ping = math.floor(player:GetNetworkPing() * 1000)
+    
     local embed = {
         title = title,
         color = color or 1752220,
-        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-    }
-
-    -- Add Thumbnail if enabled
-    if thumbnailActive then
-        embed.thumbnail = {
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        thumbnail = {
             url = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=420&height=420&format=png"
         }
-    end
+    }
 
     if isUpdateLog then
         embed.description = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.4.0*"
@@ -115,8 +113,9 @@ local function sendWebhook(title, reason, color, isUpdateLog)
             { name = "🎮 Game", value = currentGameName, inline = true },
             { name = "🔢 Server Version", value = "v" .. game.PlaceVersion, inline = true },
             { name = "👥 Players", value = #Players:GetPlayers() .. " / " .. Players.MaxPlayers, inline = true },
-            { name = "📊 Session Info", value = "Uptime: " .. os.date("!%X", os.time() - startTime), inline = false },
-            { name = "🕒 Updated At", value = "<t:" .. currentTime .. ":f>", inline = true },
+            { name = "🛰️ Performance", value = "FPS: " .. fps .. " | Ping: " .. ping .. "ms", inline = true },
+            { name = "📊 Session Info", value = "Uptime: " .. os.date("!%X", os.time() - startTime), inline = true },
+            { name = "🕒 Updated At", value = "<t:" .. currentTime .. ":f>", inline = false },
             { name = "🔔 Next Update", value = "<t:" .. (currentTime + HEARTBEAT_INTERVAL) .. ":R>", inline = true },
             { name = "💬 Status", value = "```" .. reason .. "```", inline = false }
         }
@@ -203,35 +202,29 @@ local MonitorTab = createTab()
 local ShieldTab = createTab()
 local SettingsTab = createTab()
 
--- 5. CONTENT: MONITOR TAB
+-- MONITOR TAB
 local timerLabel = Instance.new("TextLabel", MonitorTab)
-timerLabel.Size = UDim2.new(1, 0, 0, 40); timerLabel.Position = UDim2.new(0, 0, 0, 0)
-timerLabel.Text = "00:00"; timerLabel.TextColor3 = getThemeColor(); timerLabel.TextSize = 30; timerLabel.Font = Enum.Font.GothamBold; timerLabel.BackgroundTransparency = 1
+timerLabel.Size = UDim2.new(1, 0, 0, 50); timerLabel.Position = UDim2.new(0, 0, 0, 0)
+timerLabel.Text = "00:00"; timerLabel.TextColor3 = getThemeColor(); timerLabel.TextSize = 35; timerLabel.Font = Enum.Font.GothamBold; timerLabel.BackgroundTransparency = 1
 
 local monToggleBtn = Instance.new("TextButton", MonitorTab)
-monToggleBtn.Size = UDim2.new(0.48, 0, 0, 30); monToggleBtn.Position = UDim2.new(0, 0, 0.22, 0)
+monToggleBtn.Size = UDim2.new(0.6, 0, 0, 30); monToggleBtn.Position = UDim2.new(0.2, 0, 0.25, 0)
 monToggleBtn.Text = monitorActive and "MONITOR: ON" or "MONITOR: OFF"
 monToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(100, 0, 0)
-monToggleBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", monToggleBtn); monToggleBtn.Font = Enum.Font.GothamBold; monToggleBtn.TextSize = 9
-
-local imgToggleBtn = Instance.new("TextButton", MonitorTab)
-imgToggleBtn.Size = UDim2.new(0.48, 0, 0, 30); imgToggleBtn.Position = UDim2.new(0.52, 0, 0.22, 0)
-imgToggleBtn.Text = thumbnailActive and "THUMBNAIL: ON" or "THUMBNAIL: OFF"
-imgToggleBtn.BackgroundColor3 = thumbnailActive and Color3.fromRGB(0, 80, 200) or Color3.fromRGB(80, 80, 80)
-imgToggleBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", imgToggleBtn); imgToggleBtn.Font = Enum.Font.GothamBold; imgToggleBtn.TextSize = 9
+monToggleBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", monToggleBtn)
 
 local monitorStatus = Instance.new("TextLabel", MonitorTab)
-monitorStatus.Size = UDim2.new(0.95, 0, 0, 45); monitorStatus.Position = UDim2.new(0.025, 0, 0.42, 0)
+monitorStatus.Size = UDim2.new(0.95, 0, 0, 45); monitorStatus.Position = UDim2.new(0.025, 0, 0.45, 0)
 monitorStatus.BackgroundColor3 = Color3.fromRGB(30, 30, 35); monitorStatus.TextColor3 = Color3.new(0.8, 0.8, 0.8)
 monitorStatus.Text = "Heartbeat: Active\nUptime: 0h 0m"; monitorStatus.Font = Enum.Font.Code; monitorStatus.TextSize = 10
 Instance.new("UICorner", monitorStatus)
 
 local testBtn = Instance.new("TextButton", MonitorTab)
-testBtn.Size = UDim2.new(0.5, 0, 0, 30); testBtn.Position = UDim2.new(0.25, 0, 0.72, 0)
+testBtn.Size = UDim2.new(0.5, 0, 0, 30); testBtn.Position = UDim2.new(0.25, 0, 0.75, 0)
 testBtn.Text = "🧪 SEND TEST"; testBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50); testBtn.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", testBtn)
 
--- 6. CONTENT: SHIELD TAB
+-- SHIELD TAB
 local shieldStatus = Instance.new("TextLabel", ShieldTab)
 shieldStatus.Size = UDim2.new(0.95, 0, 0, 40); shieldStatus.Position = UDim2.new(0.025, 0, 0, 0)
 shieldStatus.BackgroundColor3 = Color3.fromRGB(20, 20, 25); shieldStatus.TextColor3 = Color3.new(0, 1, 0.8); shieldStatus.Text = "Shield: STANDBY"; shieldStatus.Font = Enum.Font.Code; shieldStatus.TextSize = 11
@@ -252,7 +245,7 @@ local feed = Instance.new("ScrollingFrame", ShieldTab)
 feed.Size = UDim2.new(0.95, 0, 0, 60); feed.Position = UDim2.new(0.025, 0, 0.65, 0); feed.BackgroundColor3 = Color3.new(0,0,0); feed.CanvasSize = UDim2.new(0,0,0,0)
 local feedList = Instance.new("UIListLayout", feed)
 
--- 7. CONTENT: SETTINGS TAB
+-- SETTINGS TAB
 local function createSetBtn(name, pos, color)
     local b = Instance.new("TextButton", SettingsTab); b.Size = UDim2.new(0.46, 0, 0, 35); b.Position = pos; b.Text = name; b.BackgroundColor3 = Color3.fromRGB(35, 35, 45); b.TextColor3 = color; b.Font = Enum.Font.GothamBold; b.TextSize = 9; Instance.new("UICorner", b); return b
 end
@@ -269,7 +262,6 @@ local function setOverlayState(visible)
     Nav.Visible = not visible
 end
 
--- 8. OVERLAYS (MODAL FIX)
 local function createOverlay(placeholder)
     local o = Instance.new("Frame", MainFrame); o.Size = UDim2.new(1,0,1,0); o.BackgroundColor3 = Color3.fromRGB(15, 15, 20); o.Visible = false; o.ZIndex = 10; Instance.new("UICorner", o)
     o.Active = true
@@ -284,7 +276,6 @@ local timeO, timeI, timeC = createOverlay("Interval in Minutes")
 local webO, webI, webC = createOverlay("Webhook URL")
 local idO, idI, idC = createOverlay("Discord User ID")
 
--- 9. LOGIC: TAB NAVIGATION
 local function showTab(tab)
     MonitorTab.Visible = false; ShieldTab.Visible = false; SettingsTab.Visible = false; tab.Visible = true
 end
@@ -293,27 +284,18 @@ navBtn("MONITOR", 0).MouseButton1Click:Connect(function() showTab(MonitorTab) en
 navBtn("SHIELD", 0.333).MouseButton1Click:Connect(function() showTab(ShieldTab) end)
 navBtn("SETTINGS", 0.666).MouseButton1Click:Connect(function() showTab(SettingsTab) end)
 
--- 10. LOGIC: SHIELD ACTIONS
 local function shieldLog(msg, col)
     local l = Instance.new("TextLabel", feed); l.Size = UDim2.new(1, 0, 0, 18); l.Text = "[" .. os.date("%X") .. "] " .. msg; l.TextColor3 = col or Color3.new(1,1,1); l.BackgroundTransparency = 1; l.TextSize = 10; l.Font = Enum.Font.Code
     feed.CanvasSize = UDim2.new(0, 0, 0, feedList.AbsoluteContentSize.Y)
     feed.CanvasPosition = Vector2.new(0, feed.CanvasSize.Y.Offset)
 end
 
--- 11. CONNECTIONS
+-- CONNECTIONS
 monToggleBtn.MouseButton1Click:Connect(function()
     monitorActive = not monitorActive
     monToggleBtn.Text = monitorActive and "MONITOR: ON" or "MONITOR: OFF"
     monToggleBtn.BackgroundColor3 = monitorActive and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(100, 0, 0)
     mySettings.MonitorEnabled = monitorActive
-    if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
-end)
-
-imgToggleBtn.MouseButton1Click:Connect(function()
-    thumbnailActive = not thumbnailActive
-    imgToggleBtn.Text = thumbnailActive and "THUMBNAIL: ON" or "THUMBNAIL: OFF"
-    imgToggleBtn.BackgroundColor3 = thumbnailActive and Color3.fromRGB(0, 80, 200) or Color3.fromRGB(80, 80, 80)
-    mySettings.ThumbnailEnabled = thumbnailActive
     if writefile then writefile(LOCAL_FILE, HttpService:JSONEncode(mySettings)) end
 end)
 
@@ -339,7 +321,7 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function() _G.WatchdogRunning = false; ScreenGui:Destroy() end)
-testBtn.MouseButton1Click:Connect(function() sendWebhook("🧪 Test", "Integrated Thumbnail System Active!", 10181046, false) end)
+testBtn.MouseButton1Click:Connect(function() sendWebhook("🧪 Test", "Integrated System Working!", 10181046, false) end)
 
 afkBtn.MouseButton1Click:Connect(function()
     antiAfkActive = not antiAfkActive
@@ -385,12 +367,9 @@ idC.MouseButton1Click:Connect(function()
     sendWebhook("✅ Watchdog Config", "System Linked Successfully.", 3066993, false)
 end)
 
-resetB.MouseButton1Click:Connect(function()
-    if isfile(LOCAL_FILE) then delfile(LOCAL_FILE) end
-    player:Kick("Watchdog Reset complete.")
-end)
+resetB.MouseButton1Click:Connect(function() if isfile(LOCAL_FILE) then delfile(LOCAL_FILE) end player:Kick("Watchdog Reset complete.") end)
 
--- 12. CORE LOOPS
+-- LOOPS
 player.Idled:Connect(function()
     if antiAfkActive then
         VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
@@ -410,7 +389,7 @@ end)
 
 task.spawn(function()
     if globalSet.LastBuild ~= "6.4.0" then
-        sendWebhook("📜 Monitor System Updated: 6.4.0", "• Avatar View Tracking (Webhook Thumbnail)\n• Thumbnail Toggle in Monitor Tab\n• GUI Censorship Integration", 16763904, true)
+        sendWebhook("📜 System Updated: 6.4.0", "• Added Player Avatar Thumbnails to Webhooks\n• Added Real-time FPS and Ping monitoring\n• Enhanced privacy features and bug fixes", 16763904, true)
         globalSet.LastBuild = "6.4.0"
         if writefile then writefile(GLOBAL_FILE, HttpService:JSONEncode(globalSet)) end
     end
@@ -422,7 +401,7 @@ task.spawn(function()
             while timeLeft > 0 and _G.WatchdogRunning and not forceRestartLoop and monitorActive do
                 local timeStr = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
                 timerLabel.Text = timeStr
-                if isMinimized then Title.Text = "HEARTBEAT: " .. timeStr end
+                if isMinimized then Title.Text = "HB: " .. timeStr .. " | " .. censorName(player.Name) end
                 monitorStatus.Text = "Heartbeat: Active\nUptime: " .. os.date("!%X", os.time() - startTime)
                 task.wait(1); timeLeft = timeLeft - 1
             end
@@ -455,14 +434,11 @@ task.spawn(function()
                 end)
                 lastAfkAction = tick(); currentAfkInterval = mySettings.AntiAfkTime + math.random(-5, 5)
             end
-        else
-            shieldStatus.Text = "Shield: STANDBY\nAuto-Rejoin: " .. (autoRejoinActive and "ON" or "OFF")
-        end
+        else shieldStatus.Text = "Shield: STANDBY\nAuto-Rejoin: " .. (autoRejoinActive and "ON" or "OFF") end
         task.wait(1)
     end
 end)
 
--- Dragging Logic
 local dragging, dragStart, startPos
 MainFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dragStart = input.Position startPos = MainFrame.Position end end)
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
