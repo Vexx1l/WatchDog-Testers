@@ -405,7 +405,7 @@ task.spawn(function()
             while timeLeft > 0 and _G.WatchdogRunning and not forceRestartLoop and monitorActive do
                 local timeStr = string.format("%02d:%02d", math.floor(timeLeft/60), timeLeft%60)
                 timerLabel.Text = timeStr
-                if isMinimized then Title.Text = "HB: " .. timeStr .. " | " .. censorName(player.Name) end
+                if isMinimized then Title.Text = "HeartBeat: " .. timeStr .. " | " .. censorName(player.Name) end
                 monitorStatus.Text = "Heartbeat: Active\nUptime: " .. os.date("!%X", os.time() - startTime)
                 task.wait(1); timeLeft = timeLeft - 1
             end
