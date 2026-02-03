@@ -1,5 +1,5 @@
--- [[ WATCHDOG INTEGRATED - VERSION 6.4.1 ]] --
--- [[ Thumbnail & Performance Fix Edition ]] --
+-- [[ WATCHDOG INTEGRATED - VERSION 6.4.2 ]] --
+-- [[ Optimized Thumbnail & Embed Fix ]] --
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 local Players = game:GetService("Players")
@@ -86,30 +86,28 @@ local autoRejoinActive = mySettings.AutoRejoin
 local lastAfkAction = tick()
 local currentAfkInterval = mySettings.AntiAfkTime
 
--- 3. WEBHOOK CORE (FIXED THUMBNAIL LOGIC)
+-- 3. WEBHOOK CORE (FIXED THUMBNAIL)
 local function sendWebhook(title, reason, color, isUpdateLog)
     if not monitorActive or WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
     if isBlocked and tick() < blockExpires then return end
-    isBlocked = false
 
     local currentTime = os.time()
     local fps = math.floor(workspace:GetRealPhysicsFPS())
     local ping = math.floor(player:GetNetworkPing() * 1000)
     
-    -- Optimized Thumbnail URL Construction
-    local thumbUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(player.UserId) .. "&width=420&height=420&format=png"
+    -- FIXED: Changed to Avatar-Bust URL for better Webhook parsing
+    local thumbUrl = "https://www.roblox.com/avatar-thumbnail/image?userId=" .. tostring(player.UserId) .. "&width=420&height=420&format=png"
     
     local embed = {
         ["title"] = title,
         ["color"] = color or 1752220,
+        ["footer"] = { ["text"] = "Watchdog Integrated • Build 6.4.2" },
         ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-        ["thumbnail"] = {
-            ["url"] = thumbUrl
-        }
+        ["thumbnail"] = { ["url"] = thumbUrl }
     }
 
     if isUpdateLog then
-        embed["description"] = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.4.1*"
+        embed["description"] = "**Change Log:**\n" .. reason
     else
         embed["description"] = "Status for **" .. webhookCensor(player.Name) .. "**"
         embed["fields"] = {
