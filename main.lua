@@ -1,5 +1,5 @@
--- [[ WATCHDOG INTEGRATED - VERSION 6.4.2 ]] --
--- [[ Optimized Thumbnail & Embed Fix ]] --
+-- [[ WATCHDOG INTEGRATED - VERSION 6.4.1 ]] --
+-- [[ Performance Edition - Thumbnails Removed ]] --
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 local Players = game:GetService("Players")
@@ -10,7 +10,6 @@ local UserInputService = game:GetService("UserInputService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
-local Stats = game:GetService("Stats")
 
 -- CENSORSHIP UTILS
 local function censorName(name)
@@ -21,7 +20,7 @@ local function webhookCensor(name)
     return "||" .. name .. "||"
 end
 
--- 0. PLACE NAME OVERRIDES
+-- PLACE NAME OVERRIDES
 local placeNameOverrides = {
     [76558904092080]  = "The Forge (World 1)",
     [129009554587176] = "The Forge (World 2)",
@@ -44,7 +43,7 @@ local function deepClean()
 end
 deepClean()
 
--- 2. GLOBAL STATE & CONFIG
+-- 2. GLOBAL STATE & CONFIG (JSON SYSTEM)
 if _G.WatchdogRunning then _G.WatchdogRunning = false task.wait(0.5) end
 _G.WatchdogRunning = true
 local SESSION_ID = tick()
@@ -81,33 +80,24 @@ local blockExpires = 0
 local forceRestartLoop = false
 local monitorActive = mySettings.MonitorEnabled
 
-local antiAfkActive = false
-local autoRejoinActive = mySettings.AutoRejoin
-local lastAfkAction = tick()
-local currentAfkInterval = mySettings.AntiAfkTime
-
--- 3. WEBHOOK CORE (FIXED THUMBNAIL)
+-- 3. WEBHOOK CORE (THUMBNAIL REMOVED)
 local function sendWebhook(title, reason, color, isUpdateLog)
     if not monitorActive or WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
     if isBlocked and tick() < blockExpires then return end
+    isBlocked = false
 
     local currentTime = os.time()
     local fps = math.floor(workspace:GetRealPhysicsFPS())
     local ping = math.floor(player:GetNetworkPing() * 1000)
     
-    -- FIXED: Changed to Avatar-Bust URL for better Webhook parsing
-    local thumbUrl = "https://www.roblox.com/avatar-thumbnail/image?userId=" .. tostring(player.UserId) .. "&width=420&height=420&format=png"
-    
     local embed = {
         ["title"] = title,
         ["color"] = color or 1752220,
-        ["footer"] = { ["text"] = "Watchdog Integrated • Build 6.4.2" },
-        ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-        ["thumbnail"] = { ["url"] = thumbUrl }
+        ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
     }
 
     if isUpdateLog then
-        embed["description"] = "**Change Log:**\n" .. reason
+        embed["description"] = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.4.1*"
     else
         embed["description"] = "Status for **" .. webhookCensor(player.Name) .. "**"
         embed["fields"] = {
@@ -130,7 +120,7 @@ local function sendWebhook(title, reason, color, isUpdateLog)
     local requestFunc = (request or http_request or syn.request or (http and http.request))
     if requestFunc then
         task.spawn(function()
-            local success, response = pcall(function()
+            local _, response = pcall(function()
                 return requestFunc({
                     Url = WEBHOOK_URL, 
                     Method = "POST", 
