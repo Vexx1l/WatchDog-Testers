@@ -344,7 +344,7 @@ afkInput.FocusLost:Connect(function()
 end)
 
 botB.MouseButton1Click:Connect(function() setclipboard("https://discord.com/oauth2/authorize?client_id=1460862231926407252&permissions=8&integration_type=0&scope=bot") shieldLog("Bot link copied!", Color3.new(0,1,0)) end)
-dscB.MouseButton1Click:Connect(function() setclipboard("https://discord.gg/Gzqm7NKJUM") shieldLog("Discord link copied!", Color3.new(0,1,0)) end)
+dscB.MouseButton1Click:Connect(function() setclipboard("https://discord.gg/c3F7p2ygPJ") shieldLog("Discord link copied!", Color3.new(0,1,0)) end)
 
 timeB.MouseButton1Click:Connect(function() timeO.Visible = true; setOverlayState(true) end)
 timeC.MouseButton1Click:Connect(function() 
