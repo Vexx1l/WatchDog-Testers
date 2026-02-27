@@ -85,35 +85,116 @@ local BOSS_CONFIG = {
     SyncInterval = 5
 }
 
--- 3. WEBHOOK CORE
-local function sendWebhook(title, reason, color)
-    if not monitorActive or WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" then return end
+-- 3. WEBHOOK CORE (THUMBNAIL REMOVED)
+
+local function sendWebhook(title, reason, color, isUpdateLog)
+
+    if not monitorActive or WEBHOOK_URL == "" or WEBHOOK_URL == "PASTE_WEBHOOK_HERE" or not _G.WatchdogRunning then return end
+
+    if isBlocked and tick() < blockExpires then return end
+
+    isBlocked = false
+
+
+
+    local currentTime = os.time()
+
+    local fps = math.floor(workspace:GetRealPhysicsFPS())
+
+    local ping = math.floor(player:GetNetworkPing() * 1000)
+
     
+
     local embed = {
+
         ["title"] = title,
-        ["description"] = "Status for **" .. player.Name .. "**\n```" .. reason .. "```",
+
         ["color"] = color or 1752220,
-        ["fields"] = {
-            { ["name"] = "🎮 Game", ["value"] = currentGameName, ["inline"] = true },
-            { ["name"] = "📊 Uptime", ["value"] = os.date("!%X", os.time() - startTime), ["inline"] = true }
-        },
+
         ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+
     }
 
-    local requestFunc = (request or http_request or syn.request)
-    if requestFunc then
-        task.spawn(function()
-            pcall(function()
-                requestFunc({
-                    Url = WEBHOOK_URL,
-                    Method = "POST",
-                    Headers = {["Content-Type"] = "application/json"},
-                    Body = HttpService:JSONEncode({["content"] = "<@" .. DISCORD_USER_ID .. ">", ["embeds"] = {embed}})
-                })
-            end)
-        end)
+
+
+    if isUpdateLog then
+
+        embed["description"] = "**Change Log:**\n" .. reason .. "\n\n*Integrated Update • Build 6.4.1*"
+
+    else
+
+        embed["description"] = "Status for **" .. webhookCensor(player.Name) .. "**"
+
+        embed["fields"] = {
+
+            { ["name"] = "🎮 Game", ["value"] = currentGameName, ["inline"] = true },
+
+            { ["name"] = "🔢 Server Version", ["value"] = "v" .. game.PlaceVersion, ["inline"] = true },
+
+            { ["name"] = "👥 Players", ["value"] = #Players:GetPlayers() .. " / " .. Players.MaxPlayers, ["inline"] = true },
+
+            { ["name"] = "🛰️ Performance", ["value"] = "FPS: " .. fps .. " | Ping: " .. ping .. "ms", ["inline"] = true },
+
+            { ["name"] = "📊 Session Info", ["value"] = "Uptime: " .. os.date("!%X", os.time() - startTime), ["inline"] = true },
+
+            { ["name"] = "🕒 Updated At", ["value"] = "<t:" .. currentTime .. ":f>", ["inline"] = false },
+
+            { ["name"] = "🔔 Next Update", ["value"] = "<t:" .. (currentTime + HEARTBEAT_INTERVAL) .. ":R>", ["inline"] = true },
+
+            { ["name"] = "💬 Status", ["value"] = "```" .. reason .. "```", ["inline"] = false }
+
+        }
+
     end
+
+
+
+    local payload = HttpService:JSONEncode({
+
+        ["content"] = (not isUpdateLog and title ~= "🔄 Heartbeat") and "<@" .. DISCORD_USER_ID .. ">" or nil,
+
+        ["embeds"] = {embed}
+
+    })
+
+
+
+    local requestFunc = (request or http_request or syn.request or (http and http.request))
+
+    if requestFunc then
+
+        task.spawn(function()
+
+            local _, response = pcall(function()
+
+                return requestFunc({
+
+                    Url = WEBHOOK_URL, 
+
+                    Method = "POST", 
+
+                    Headers = {["Content-Type"] = "application/json"}, 
+
+                    Body = payload
+
+                })
+
+            end)
+
+            if response and response.StatusCode == 429 then
+
+                isBlocked = true
+
+                blockExpires = tick() + (tonumber(response.Headers["retry-after"]) or 60)
+
+            end
+
+        end)
+
+    end
+
 end
+
 
 -- 4. UI CREATION
 local ScreenGui = Instance.new("ScreenGui", (game:GetService("CoreGui") or player.PlayerGui))
